@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: sangarsh-science-omr
+    env: python
+    buildCommand: ""
+    startCommand: python3 backend/app.py
+    autoDeploy: true

@@ -424,14 +424,16 @@ def get_local_ip():
     except:
         return '127.0.0.1'
 
-def run_server(port=8080):
+def run_server(port=None):
+    if port is None:
+        port = int(os.environ.get('PORT', 8080))
     local_ip = get_local_ip()
     try:
         server_address = ('0.0.0.0', port)
         httpd = HTTPServer(server_address, SangarshAPIHandler)
         print(f"\n=======================================================")
         print(f"🚀 Sangarsh Science Education OMR Server Running!")
-        print(f"💻 Laptop Access : http://127.0.0.1:{port}")
+        print(f"💻 Local Access  : http://127.0.0.1:{port}")
         print(f"📱 Mobile Access : http://{local_ip}:{port}")
         print(f"=======================================================\n")
     except Exception as e:
@@ -446,7 +448,5 @@ def run_server(port=8080):
         httpd.server_close()
 
 if __name__ == "__main__":
-    port = 8000
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
-    run_server(port)
+    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 else None
+    run_server(port_arg)
