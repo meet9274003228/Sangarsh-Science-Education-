@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sangarsh Science Education — OMR Evaluation System</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#F0F9FF',
+              100: '#E0F2FE',
+              500: '#0284C7',
+              600: '#0284C7',
+              700: '#0369A1',
+              900: '#0A192F',
+            },
+            accent: {
+              gold: '#F59E0B',
+              navy: '#112240',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+  
+  <!-- Main Application Container -->
+  <div id="app" class="min-h-screen flex flex-col">
+    <!-- Rendered dynamically by app.js -->
+  </div>
+
+  <!-- Main JavaScript Engine -->
+  <script src="app.js"></script>
+</body>
+</html>

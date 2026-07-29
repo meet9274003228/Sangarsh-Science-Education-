@@ -1,0 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --sse-navy: #0A192F;
+  --sse-navy-light: #172A45;
+  --sse-blue: #0284C7;
+  --sse-blue-accent: #38BDF8;
+  --sse-gold: #F59E0B;
+  --sse-gold-light: #FDE68A;
+  --sse-card-bg: #112240;
+  --sse-border: #233554;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: #0B132B;
+  color: #F1F5F9;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6, .brand-font {
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Glassmorphism Cards */
+.glass-panel {
+  background: rgba(17, 34, 64, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border-radius: 16px;
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0F172A;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+}
+
+/* Glowing Accent Button */
+.btn-primary {
+  background: linear-gradient(135deg, #0284C7 0%, #2563EB 100%);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.25s ease-in-out;
+  box-shadow: 0 4px 14px 0 rgba(2, 132, 199, 0.39);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(2, 132, 199, 0.55);
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.25s ease-in-out;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.35);
+}
+
+.btn-gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(245, 158, 11, 0.5);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B132B;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #38BDF8;
+}
+
+/* Bubble Styling for Key Matrix & Scans */
+.bubble-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 2px solid #334155;
+  color: #94A3B8;
+  background: #0F172A;
+}
+
+.bubble-btn.selected {
+  border-color: #38BDF8;
+  background: #0284C7;
+  color: #FFFFFF;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+.bubble-btn.correct {
+  border-color: #22C55E;
+  background: #15803D;
+  color: #FFFFFF;
+}
+
+.bubble-btn.wrong {
+  border-color: #EF4444;
+  background: #B91C1C;
+  color: #FFFFFF;
+}
+
+/* OMR Preview Canvas Scanner Line */
+@keyframes scanLine {
+  0% { top: 0%; opacity: 0.8; }
+  50% { top: 95%; opacity: 1; }
+  100% { top: 0%; opacity: 0.8; }
+}
+
+.scanner-laser {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #38BDF8, #22C55E, #38BDF8, transparent);
+  box-shadow: 0 0 15px #38BDF8, 0 0 8px #22C55E;
+  animation: scanLine 2.5s infinite ease-in-out;
+  pointer-events: none;
+}
