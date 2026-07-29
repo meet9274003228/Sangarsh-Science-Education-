@@ -413,10 +413,32 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
 
         self._send_error("Route not found", status=404)
 
+def get_local_ip():
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return '127.0.0.1'
+
 def run_server(port=8080):
-    server_address = ('127.0.0.1', port)
-    httpd = HTTPServer(server_address, SangarshAPIHandler)
-    print(f"🚀 Sangarsh Science Education OMR App Server running at http://127.0.0.1:{port}")
+    local_ip = get_local_ip()
+    try:
+        server_address = ('0.0.0.0', port)
+        httpd = HTTPServer(server_address, SangarshAPIHandler)
+        print(f"\n=======================================================")
+        print(f"🚀 Sangarsh Science Education OMR Server Running!")
+        print(f"💻 Laptop Access : http://127.0.0.1:{port}")
+        print(f"📱 Mobile Access : http://{local_ip}:{port}")
+        print(f"=======================================================\n")
+    except Exception as e:
+        server_address = ('127.0.0.1', port)
+        httpd = HTTPServer(server_address, SangarshAPIHandler)
+        print(f"🚀 Sangarsh Science Education OMR Server running at http://127.0.0.1:{port}")
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

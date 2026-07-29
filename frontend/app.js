@@ -1,6 +1,6 @@
 /**
  * Sangarsh Science Education — OMR Evaluation Application Engine
- * Frontend JavaScript Client (SPA)
+ * Frontend JavaScript Client (SPA) with Mobile Camera Capture & Itemized Evaluation
  */
 
 const API_BASE = ""; // Relative API URL
@@ -8,7 +8,7 @@ const API_BASE = ""; // Relative API URL
 const state = {
   user: JSON.parse(localStorage.getItem('sse_user')) || { id: 1, name: "Sangarsh Admin", email: "admin@sangarsh.edu" },
   token: localStorage.getItem('sse_token') || "sse_token_admin_2026",
-  currentView: 'exams', // 'dashboard', 'exams', 'answer_key', 'omr_generator', 'omr_scanner', 'results', 'students'
+  currentView: 'exams',
   exams: [],
   selectedExam: null,
   results: [],
@@ -59,12 +59,12 @@ function renderHeader() {
             SSE
           </div>
           <div>
-            <h1 class="text-lg font-bold text-white tracking-wide leading-tight">SANGARSH SCIENCE EDUCATION</h1>
-            <p class="text-xs text-sky-400 font-medium">OMR Evaluation & Analytics Portal</p>
+            <h1 class="text-base sm:text-lg font-bold text-white tracking-wide leading-tight">SANGARSH SCIENCE EDUCATION</h1>
+            <p class="text-xs text-sky-400 font-medium">11th & 12th OMR Evaluation Portal</p>
           </div>
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
           <div class="hidden sm:flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
             <i data-lucide="user-check" class="w-4 h-4 text-emerald-400"></i>
             <span class="text-xs font-semibold text-slate-200">${state.user.name}</span>
@@ -85,18 +85,18 @@ function renderSidebar() {
   const navItems = [
     { id: 'exams', label: 'Exams & Answer Keys', icon: 'file-text' },
     { id: 'omr_generator', label: 'OMR Sheet Generator', icon: 'printer' },
-    { id: 'omr_scanner', label: 'OMR Scanning Engine', icon: 'scan-line' },
+    { id: 'omr_scanner', label: 'Mobile OMR Scanner', icon: 'scan-line' },
     { id: 'results', label: 'Result Dashboard', icon: 'bar-chart-3' },
     { id: 'students', label: 'Student Directory', icon: 'users' },
   ];
 
   return `
     <aside class="w-full md:w-64 flex-shrink-0">
-      <div class="glass-panel p-4 flex flex-col gap-1 sticky top-20">
-        <div class="px-3 py-2 text-[11px] font-bold tracking-wider text-slate-400 uppercase">Navigation</div>
+      <div class="glass-panel p-3 sm:p-4 flex md:flex-col flex-row overflow-x-auto gap-2 sticky top-20">
+        <div class="hidden md:block px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 uppercase">Navigation</div>
         ${navItems.map(item => `
           <button onclick="navigateTo('${item.id}')" 
-                  class="flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                  class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-medium text-xs sm:text-sm whitespace-nowrap transition-all ${
                     state.currentView === item.id 
                       ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' 
                       : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
@@ -136,8 +136,8 @@ function renderExamsView() {
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 class="text-2xl font-bold text-white">Exam Management</h2>
-          <p class="text-sm text-slate-400">Create exams, set marking schemes, and build question answer keys.</p>
+          <h2 class="text-2xl font-bold text-white">11th & 12th Exam Management</h2>
+          <p class="text-sm text-slate-400">Physics, Chemistry, Mathematics & Biology Assessments.</p>
         </div>
         <button onclick="openCreateExamModal()" class="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm shadow-lg">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
@@ -151,7 +151,7 @@ function renderExamsView() {
           <div class="col-span-full glass-panel p-8 text-center text-slate-400">
             <i data-lucide="folder-open" class="w-12 h-12 mx-auto text-sky-400/50 mb-3"></i>
             <p class="font-semibold text-slate-300">No Exams Found</p>
-            <p class="text-xs mt-1">Click "Create New Exam" to set up your first OMR assessment.</p>
+            <p class="text-xs mt-1">Click "Create New Exam" to set up your first 11th/12th Science OMR test.</p>
           </div>
         ` : state.exams.map(exam => `
           <div class="glass-panel p-5 space-y-4 hover:border-sky-500/40 transition-all">
@@ -176,13 +176,13 @@ function renderExamsView() {
 
               <div class="flex items-center gap-2">
                 <button onclick="editAnswerKey(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 text-xs font-semibold flex items-center gap-1.5">
-                  <i data-lucide="key" class="w-3.5 h-3.5"></i> Key Matrix
+                  <i data-lucide="key" class="w-3.5 h-3.5"></i> Answer Key
                 </button>
                 <button onclick="generateOMRSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-semibold flex items-center gap-1.5">
                   <i data-lucide="file-down" class="w-3.5 h-3.5"></i> PDF Sheet
                 </button>
                 <button onclick="scanExamSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold flex items-center gap-1.5">
-                  <i data-lucide="scan" class="w-3.5 h-3.5"></i> Scan
+                  <i data-lucide="scan" class="w-3.5 h-3.5"></i> Mobile Scan
                 </button>
               </div>
             </div>
@@ -208,7 +208,7 @@ function renderAnswerKeyView() {
             <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to Exams
           </button>
           <h2 class="text-2xl font-bold text-white">Answer Key Matrix</h2>
-          <p class="text-sm text-slate-400">${state.selectedExam.exam_name} (${total} Questions)</p>
+          <p class="text-sm text-slate-400">${state.selectedExam.exam_name} (${state.selectedExam.subject} - ${total} Questions)</p>
         </div>
 
         <button onclick="saveAnswerKey()" class="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm">
@@ -259,7 +259,7 @@ function renderOMRGeneratorView() {
             <select id="sheetExamSelect" onchange="onSheetExamChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-sky-500 outline-none">
               ${state.exams.map(e => `
                 <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
-                  ${e.exam_name} (${e.total_questions} Questions)
+                  ${e.exam_name} (${e.subject} - ${e.total_questions} Qs)
                 </option>
               `).join('')}
             </select>
@@ -287,21 +287,21 @@ function renderOMRGeneratorView() {
   `;
 }
 
-// 4. OMR SCANNER VIEW
+// 4. OMR SCANNER VIEW (WITH MOBILE CAMERA CAPTURE & ITEMIZED RIGHT/WRONG ANALYSIS)
 function renderOMRScannerView() {
   return `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 class="text-2xl font-bold text-white">OMR Scanning & Evaluation Engine</h2>
-          <p class="text-sm text-slate-400">Scan candidate sheets via live mobile camera or image file upload.</p>
+          <h2 class="text-2xl font-bold text-white">Mobile Camera OMR Scanning Engine</h2>
+          <p class="text-sm text-slate-400">Click photo directly with Mobile Camera to evaluate instantly.</p>
         </div>
 
         <div class="flex items-center gap-3">
           <select id="scannerExamSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
             ${state.exams.map(e => `
               <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
-                ${e.exam_name}
+                ${e.exam_name} (${e.subject})
               </option>
             `).join('')}
           </select>
@@ -313,74 +313,100 @@ function renderOMRScannerView() {
         <div class="glass-panel p-6 space-y-4 flex flex-col justify-between">
           <div class="space-y-4">
             <h3 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="camera" class="w-4 h-4 text-sky-400"></i>
-              Sheet Capture & Alignment
+              <i data-lucide="camera" class="w-5 h-5 text-sky-400"></i>
+              Mobile Camera & Image Input
             </h3>
 
-            <div id="dropZone" class="border-2 border-dashed border-sky-500/40 rounded-2xl p-8 text-center bg-slate-900/60 hover:bg-slate-900/80 transition-all cursor-pointer relative overflow-hidden group">
-              <input type="file" id="omrFileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
-              
-              <div class="space-y-3">
-                <div class="w-12 h-12 mx-auto rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <i data-lucide="upload-cloud" class="w-6 h-6"></i>
-                </div>
-                <div>
-                  <p class="font-bold text-sm text-white">Click or Drag OMR Sheet Image Here</p>
-                  <p class="text-xs text-slate-400 mt-0.5">Supports JPEG, PNG, WEBP (Mobile Camera Uploads)</p>
-                </div>
+            <!-- Direct Mobile Camera Permission Input -->
+            <input type="file" id="omrCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelected(event)">
+            <input type="file" id="omrFileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
+
+            <!-- Big Mobile Camera Trigger Button -->
+            <button onclick="triggerMobileCamera()" class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white font-extrabold text-base shadow-xl shadow-sky-500/30 flex items-center justify-center gap-3 hover:scale-[1.02] transition-transform">
+              <i data-lucide="camera" class="w-6 h-6 animate-pulse"></i>
+              <span>📷 Click Photo with Mobile Camera</span>
+            </button>
+
+            <!-- Drop Zone for Gallery File Upload -->
+            <div id="dropZone" onclick="triggerFileUpload()" class="border-2 border-dashed border-sky-500/40 rounded-2xl p-6 text-center bg-slate-900/60 hover:bg-slate-900/80 transition-all cursor-pointer">
+              <div class="space-y-2">
+                <i data-lucide="image" class="w-8 h-8 mx-auto text-sky-400"></i>
+                <p class="font-bold text-xs text-white">Or Select OMR Photo from Gallery</p>
               </div>
             </div>
 
-            <!-- Fast Scan Simulator Button for Demo/Testing -->
-            <button onclick="runSimulatedScan()" class="btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-sm">
+            <!-- Instant Fast Demo Scan -->
+            <button onclick="runSimulatedScan()" class="btn-gold w-full py-2.5 flex items-center justify-center gap-2 text-xs">
               <i data-lucide="zap" class="w-4 h-4"></i>
-              <span>Simulate instant Scan (Roll #100001)</span>
+              <span>Run Instant Test Scan (Roll #100001)</span>
             </button>
           </div>
 
           <div class="text-xs text-slate-500 text-center pt-2 border-t border-slate-800">
-            Automated OpenCV Perspective Transform & Bubble Darkness Thresholding active.
+            OpenCV Corner Detection + Perspective Alignment active.
           </div>
         </div>
 
         <!-- Scan Result Preview Panel -->
         <div class="glass-panel p-6 space-y-4">
           <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <i data-lucide="award" class="w-4 h-4 text-emerald-400"></i>
-            Live Evaluation Result
+            <i data-lucide="award" class="w-5 h-5 text-emerald-400"></i>
+            Live Evaluation & Right/Wrong Data
           </h3>
 
           ${state.lastScanResult ? `
             <div class="space-y-4">
-              <div class="p-4 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-center justify-between">
+              <!-- Score Header -->
+              <div class="p-4 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-between">
                 <div>
-                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Candidate Roll No</span>
-                  <p class="text-xl font-extrabold text-white font-mono">${state.lastScanResult.roll_no}</p>
-                  <p class="text-xs text-slate-400">${state.lastScanResult.student_name}</p>
+                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Candidate</span>
+                  <p class="text-lg font-extrabold text-white font-mono">${state.lastScanResult.student_name}</p>
+                  <p class="text-xs text-slate-400">Roll No: <strong class="text-white font-mono">${state.lastScanResult.roll_no}</strong></p>
                 </div>
                 <div class="text-right">
-                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Score</span>
+                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Score</span>
                   <p class="text-2xl font-extrabold text-emerald-400">${state.lastScanResult.evaluation.obtained_marks} / ${state.lastScanResult.evaluation.total_marks}</p>
-                  <p class="text-xs font-semibold text-slate-300">${state.lastScanResult.evaluation.percentage}% Marks</p>
+                  <p class="text-xs font-semibold text-white">${state.lastScanResult.evaluation.percentage}% Marks</p>
                 </div>
               </div>
 
+              <!-- Summary Badges -->
               <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                <div class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-                  <strong class="text-lg block font-bold">${state.lastScanResult.evaluation.correct_count}</strong> Correct
+                <div class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                  <strong class="text-base block font-bold">${state.lastScanResult.evaluation.correct_count}</strong> Correct ✅
                 </div>
-                <div class="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300">
-                  <strong class="text-lg block font-bold">${state.lastScanResult.evaluation.wrong_count}</strong> Wrong
+                <div class="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300">
+                  <strong class="text-base block font-bold">${state.lastScanResult.evaluation.wrong_count}</strong> Wrong ❌
                 </div>
                 <div class="p-2.5 rounded-lg bg-slate-800 text-slate-400">
-                  <strong class="text-lg block font-bold">${state.lastScanResult.evaluation.unattempted_count}</strong> Blank
+                  <strong class="text-base block font-bold">${state.lastScanResult.evaluation.unattempted_count}</strong> Blank ⚪
+                </div>
+              </div>
+
+              <!-- Itemized Right / Wrong Question Matrix -->
+              <div class="space-y-2">
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Question-Wise Right / Wrong Analysis:</h4>
+                <div class="max-h-60 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  ${Object.entries(state.lastScanResult.evaluation.itemized || {}).map(([qNum, item]) => `
+                    <div class="p-2 rounded-lg border text-xs flex items-center justify-between ${
+                      item.status === 'CORRECT' ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' :
+                      item.status === 'WRONG' ? 'bg-rose-950/40 border-rose-500/40 text-rose-300' :
+                      'bg-slate-900 border-slate-800 text-slate-400'
+                    }">
+                      <span class="font-bold">Q${qNum}</span>
+                      <span class="font-mono font-bold">
+                        ${item.status === 'CORRECT' ? `✅ ${item.scanned}` :
+                          item.status === 'WRONG' ? `❌ ${item.scanned} (${item.correct})` : `⚪ Blank`}
+                      </span>
+                    </div>
+                  `).join('')}
                 </div>
               </div>
             </div>
           ` : `
             <div class="h-64 flex flex-col items-center justify-center text-center text-slate-500 space-y-2">
               <i data-lucide="scan" class="w-10 h-10 text-slate-600"></i>
-              <p class="text-xs">No scan performed yet. Upload an OMR sheet to evaluate.</p>
+              <p class="text-xs">No scan performed yet. Click camera photo above to evaluate instantly.</p>
             </div>
           `}
         </div>
@@ -395,22 +421,22 @@ function renderResultsView() {
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 class="text-2xl font-bold text-white">Result & Performance Dashboard</h2>
-          <p class="text-sm text-slate-400">Student rank list, score analytics, and exports.</p>
+          <h2 class="text-2xl font-bold text-white">11th & 12th Result Dashboard</h2>
+          <p class="text-sm text-slate-400">Class-wise rank list, percentage, & Excel download.</p>
         </div>
 
         <div class="flex items-center gap-3">
           <select id="resultExamSelect" onchange="onResultExamChange()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
             ${state.exams.map(e => `
               <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
-                ${e.exam_name}
+                ${e.exam_name} (${e.subject})
               </option>
             `).join('')}
           </select>
 
           <button onclick="exportToCSV()" class="btn-primary px-3.5 py-2 flex items-center gap-2 text-xs">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-            <span>Export to Excel / CSV</span>
+            <span>Export to Excel</span>
           </button>
         </div>
       </div>
@@ -427,7 +453,7 @@ function renderResultsView() {
                 <th class="py-3.5 px-4">Class</th>
                 <th class="py-3.5 px-4">Obtained Marks</th>
                 <th class="py-3.5 px-4">Percentage</th>
-                <th class="py-3.5 px-4 text-center">Correct/Wrong</th>
+                <th class="py-3.5 px-4 text-center">Right / Wrong</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60 font-medium">
@@ -450,12 +476,12 @@ function renderResultsView() {
                   </td>
                   <td class="py-3.5 px-4 font-mono text-sky-400 font-bold">${r.roll_no}</td>
                   <td class="py-3.5 px-4 font-semibold text-white">${r.name || r.student_name}</td>
-                  <td class="py-3.5 px-4 text-xs text-slate-400">${r.class_name || 'Class 10'}</td>
+                  <td class="py-3.5 px-4 text-xs text-slate-400">${r.class_name || 'Class 12'}</td>
                   <td class="py-3.5 px-4 font-mono font-bold text-emerald-400">${r.obtained_marks} / ${r.total_marks}</td>
                   <td class="py-3.5 px-4 font-bold text-white">${r.percentage}%</td>
                   <td class="py-3.5 px-4 text-center text-xs font-mono">
-                    <span class="text-emerald-400 font-bold">${r.correct_count}</span> / 
-                    <span class="text-rose-400 font-bold">${r.wrong_count}</span>
+                    <span class="text-emerald-400 font-bold">${r.correct_count} ✅</span> / 
+                    <span class="text-rose-400 font-bold">${r.wrong_count} ❌</span>
                   </td>
                 </tr>
               `).join('')}
@@ -473,8 +499,8 @@ function renderStudentsView() {
     <div class="space-y-6">
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-white">Student Directory</h2>
-          <p class="text-sm text-slate-400">Manage student roll numbers and details.</p>
+          <h2 class="text-2xl font-bold text-white">Student Database</h2>
+          <p class="text-sm text-slate-400">11th & 12th Science Student Directory.</p>
         </div>
       </div>
 
@@ -505,7 +531,7 @@ function renderLogin() {
             SSE
           </div>
           <h2 class="text-2xl font-bold text-white tracking-wide">SANGARSH SCIENCE EDUCATION</h2>
-          <p class="text-xs text-sky-400 font-medium">Teacher & Admin OMR Evaluation Portal</p>
+          <p class="text-xs text-sky-400 font-medium">11th & 12th Science OMR Evaluation Portal</p>
         </div>
 
         <form onsubmit="handleLogin(event)" class="space-y-4">
@@ -665,18 +691,30 @@ async function scanExamSheet(examId) {
   navigateTo('omr_scanner');
 }
 
+function triggerMobileCamera() {
+  const camInput = document.getElementById('omrCameraInput');
+  if (camInput) camInput.click();
+}
+
+function triggerFileUpload() {
+  const fileInput = document.getElementById('omrFileInput');
+  if (fileInput) fileInput.click();
+}
+
 async function runSimulatedScan() {
   const select = document.getElementById('scannerExamSelect');
   const examId = select ? select.value : (state.selectedExam ? state.selectedExam.id : 1);
 
-  // Generate realistic scanned answers matching key
+  // Generate realistic scanned answers matching key with itemized status
   const examRes = await fetch(`/api/exams/${examId}`);
   const examData = await examRes.json();
   const key = examData.answer_key || {};
 
   const scanned = {};
   for (let q = 1; q <= examData.total_questions; q++) {
-    scanned[q] = key[q] || "A";
+    if (q % 7 === 0) scanned[q] = "NONE";
+    else if (q % 4 === 0) scanned[q] = key[q] === "A" ? "B" : "A";
+    else scanned[q] = key[q] || "A";
   }
 
   const payload = {
@@ -702,9 +740,9 @@ function exportToCSV() {
 }
 
 function openCreateExamModal() {
-  const exam_name = prompt("Enter Exam Name:", "Physics & Chemistry Midterm");
+  const exam_name = prompt("Enter Exam Name:", "12th Physics Chapterwise Assessment");
   if (!exam_name) return;
-  const subject = prompt("Enter Subject:", "Science");
+  const subject = prompt("Enter Subject (Physics / Chemistry / Mathematics / Biology):", "Physics");
   if (!subject) return;
 
   fetch('/api/exams', {
@@ -722,10 +760,7 @@ function openCreateExamModal() {
 }
 
 function attachEvents() {
-  const dropZone = document.getElementById('dropZone');
-  if (dropZone) {
-    dropZone.onclick = () => document.getElementById('omrFileInput').click();
-  }
+  // Event listeners for inputs
 }
 
 function handleFileSelected(e) {
