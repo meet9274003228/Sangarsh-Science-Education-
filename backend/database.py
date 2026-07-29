@@ -4,7 +4,7 @@ import os
 import hashlib
 import time
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
+DB_PATH = "/tmp/sse_database.db"
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
