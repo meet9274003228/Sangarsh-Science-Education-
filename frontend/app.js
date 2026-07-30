@@ -976,7 +976,8 @@ function renderLogin() {
           <div class="bg-blue-50/70 border border-blue-200 p-3.5 rounded-xl text-center space-y-1.5">
             <span class="text-[11px] font-bold text-blue-800 uppercase block">Verification Code Sent To:</span>
             <strong class="text-sm font-extrabold text-slate-900 block font-mono">${state.otpEmail}</strong>
-            <button type="button" onclick="resetOtpStep()" class="text-[11px] text-blue-700 font-bold hover:underline inline-flex items-center gap-1">
+            <p class="text-[11px] text-slate-500 font-medium">⏱️ Code expires in <strong>5 minutes</strong>. Check your inbox/spam folder.</p>
+            <button type="button" onclick="resetOtpStep()" class="text-[11px] text-blue-700 font-bold hover:underline inline-flex items-center gap-1 mt-1">
               ✏️ Change Email
             </button>
           </div>
@@ -1195,6 +1196,10 @@ function startResendTimer() {
   }, 1000);
 }
 
+function getGasWebAppUrl() {
+  return window.__ENV__?.GAS_WEB_APP_URL || state.gasWebAppUrl || '';
+}
+
 async function handleSendOtp(e) {
   if (e) e.preventDefault();
 
@@ -1225,10 +1230,11 @@ async function handleSendOtp(e) {
 
   try {
     let res, data;
+    const gasUrl = getGasWebAppUrl();
     
-    if (state.gasWebAppUrl) {
+    if (gasUrl) {
       // Call Production Google Apps Script Web App API
-      res = await fetch(state.gasWebAppUrl, {
+      res = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'sendOtp', email: email })
@@ -1285,9 +1291,11 @@ async function handleVerifyOtp(e) {
   renderApp();
 
   try {
-    if (state.gasWebAppUrl) {
+    const gasUrl = getGasWebAppUrl();
+
+    if (gasUrl) {
       // Verify OTP via Google Apps Script Web App
-      const gasRes = await fetch(state.gasWebAppUrl, {
+      const gasRes = await fetch(gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'verifyOtp', email: state.otpEmail, otp: otp })
