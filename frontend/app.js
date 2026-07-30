@@ -23,7 +23,8 @@ const state = {
   // Custom Filters & UI Controls
   selectedClass: '11th',
   selectedMedium: 'EM',
-  // 2FA Email OTP State
+  // 2FA Email OTP & Google Apps Script Config
+  gasWebAppUrl: window.__ENV__?.GAS_WEB_APP_URL || '', // Configured Google Apps Script Web App URL
   authMode: 'login', // 'login', 'register', 'forgot_password'
   otpStep: 1, // 1: Email/Password/Name -> 2: OTP Verification
   otpEmail: '',
@@ -1185,25 +1186,42 @@ async function handleSendOtp(e) {
   state.otpEmail = email;
 
   try {
-    const res = await fetch('/api/auth/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, purpose: state.authMode })
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      state.otpError = data.error || 'Failed to send OTP';
-      renderApp();
-      return;
+    let res, data;
+    
+    if (state.gasWebAppUrl) {
+      // Call Production Google Apps Script Web App API
+      res = await fetch(state.gasWebAppUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'sendOtp', email: email })
+      });
+      data = await res.json();
+      if (!data.success) {
+        state.otpError = data.error || 'Failed to send OTP via Google Apps Script.';
+        renderApp();
+        return;
+      }
+    } else {
+      // Call Local Backend API
+      res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, purpose: state.authMode })
+      });
+      data = await res.json();
+      if (!res.ok) {
+        state.otpError = data.error || 'Failed to send OTP';
+        renderApp();
+        return;
+      }
     }
 
     state.otpStep = 2;
-    state.devOtpCode = data.dev_otp || null;
+    state.devOtpCode = data.dev_otp || null; // Null in GAS production responses for security
     state.otpSuccessMsg = data.message || `Verification Code sent to ${email}`;
     renderApp();
   } catch (err) {
-    state.otpError = 'Failed to connect to server: ' + err.message;
+    state.otpError = 'Failed to send OTP: ' + err.message;
     renderApp();
   }
 }
@@ -1213,30 +1231,53 @@ async function handleVerifyOtp(e) {
   const otpInput = document.getElementById('otpCodeInput');
   const otp = otpInput ? otpInput.value.trim() : '';
 
+  if (!otp || otp.length !== 6) {
+    state.otpError = 'Please enter a valid 6-digit OTP code.';
+    renderApp();
+    return;
+  }
+
   state.otpError = '';
   state.otpSuccessMsg = '';
 
-  let endpoint = '/api/auth/verify-otp';
-  let payload = { email: state.otpEmail, otp };
-
-  if (state.authMode === 'register') {
-    endpoint = '/api/auth/register';
-    payload = {
-      email: state.otpEmail,
-      otp: otp,
-      name: state.regName || 'Sangarsh Teacher',
-      password: state.regPassword || 'admin123'
-    };
-  } else if (state.authMode === 'forgot_password') {
-    endpoint = '/api/auth/reset-password';
-    payload = {
-      email: state.otpEmail,
-      otp: otp,
-      new_password: state.resetPassword || 'admin123'
-    };
-  }
-
   try {
+    if (state.gasWebAppUrl) {
+      // Verify OTP via Google Apps Script Web App
+      const gasRes = await fetch(state.gasWebAppUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'verifyOtp', email: state.otpEmail, otp: otp })
+      });
+      const gasData = await gasRes.json();
+      
+      if (!gasData.success) {
+        state.otpError = gasData.error || 'Invalid OTP code.';
+        renderApp();
+        return;
+      }
+    }
+
+    // Process Login / Registration / Reset Password with Backend
+    let endpoint = '/api/auth/verify-otp';
+    let payload = { email: state.otpEmail, otp: otp };
+
+    if (state.authMode === 'register') {
+      endpoint = '/api/auth/register';
+      payload = {
+        email: state.otpEmail,
+        otp: otp,
+        name: state.regName || 'Sangarsh Teacher',
+        password: state.regPassword || 'admin123'
+      };
+    } else if (state.authMode === 'forgot_password') {
+      endpoint = '/api/auth/reset-password';
+      payload = {
+        email: state.otpEmail,
+        otp: otp,
+        new_password: state.resetPassword || 'admin123'
+      };
+    }
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1245,7 +1286,7 @@ async function handleVerifyOtp(e) {
     const data = await res.json();
 
     if (!res.ok) {
-      state.otpError = data.error || 'Invalid OTP code';
+      state.otpError = data.error || 'Authentication error.';
       renderApp();
       return;
     }
