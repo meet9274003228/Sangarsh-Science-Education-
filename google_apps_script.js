@@ -1,18 +1,3 @@
-/**
- * Sangarsh Science Education — OMR Evaluation System
- * Production Google Apps Script Email OTP Engine (Code.gs)
- * 
- * Features:
- * - doPost(e) Web App API Endpoint
- * - Actions: 'sendOtp' & 'verifyOtp'
- * - SHA-256 Hashed OTP Storage in CacheService
- * - 5-minute (300s) Expiration
- * - Max 5 Verification Attempts
- * - 60s Resend Rate Limiting
- * - Zero Plaintext OTP Exposure in API Responses
- * - Professional HTML Email Template via MailApp.sendEmail()
- */
-
 function doPost(e) {
   try {
     var data = {};
