@@ -98,6 +98,38 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   background: #94A3B8;
 }
 
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Mobile & Touch Responsive Enhancements */
+@media (max-width: 640px) {
+  body, #app {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  /* Touch Friendly Target Sizes */
+  .btn-primary, .btn-gold, button {
+    min-height: 38px;
+  }
+
+  /* Responsive Tables */
+  .table-responsive-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+  }
+}
+
 /* Bubble Styling for Key Matrix & Scans */
 .bubble-btn {
   width: 36px;
@@ -113,6 +145,7 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   border: 2px solid #CBD5E1;
   color: #475569;
   background: #F8FAFC;
+  touch-action: manipulation;
 }
 
 .bubble-btn:hover {
@@ -157,3 +190,4 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   animation: scanLine 2.5s infinite ease-in-out;
   pointer-events: none;
 }
+

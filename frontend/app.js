@@ -103,18 +103,18 @@ function renderApp() {
 function renderHeader() {
   return `
     <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50 border-b-2 border-amber-500">
-      <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3.5 cursor-pointer" onclick="navigateTo('exams')">
-          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-700 to-slate-900 flex items-center justify-center font-extrabold text-amber-400 text-xl shadow-md border border-amber-500/40">
+      <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 sm:gap-3.5 cursor-pointer min-w-0" onclick="navigateTo('exams')">
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-blue-700 to-slate-900 flex-shrink-0 flex items-center justify-center font-extrabold text-amber-400 text-base sm:text-xl shadow-md border border-amber-500/40">
             SSE
           </div>
-          <div>
-            <h1 class="text-base sm:text-lg font-extrabold text-white tracking-wide leading-tight">SANGARSH SCIENCE EDUCATION</h1>
-            <p class="text-xs text-amber-400 font-semibold tracking-wide">OMR Evaluation Portal</p>
+          <div class="min-w-0">
+            <h1 class="text-xs sm:text-lg font-extrabold text-white tracking-wide leading-tight truncate">SANGARSH SCIENCE EDUCATION</h1>
+            <p class="text-[10px] sm:text-xs text-amber-400 font-semibold tracking-wide truncate">OMR Evaluation Portal</p>
           </div>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 flex-shrink-0">
           <div class="hidden sm:flex items-center gap-2 bg-slate-800/90 px-3.5 py-1.5 rounded-lg border border-slate-700">
             <i data-lucide="user-check" class="w-4 h-4 text-emerald-400"></i>
             <span class="text-xs font-semibold text-slate-200">${state.user.name}</span>
@@ -133,33 +133,33 @@ function renderHeader() {
 // FILTER BAR
 function renderFilterBar() {
   return `
-    <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div class="flex items-center gap-2 w-full sm:w-auto">
-        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Class:</span>
-        <div class="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
-          <button onclick="setClassFilter('11th')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedClass === '11th' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
+    <div class="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div class="flex items-center gap-2 w-full md:w-auto">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex-shrink-0">Class:</span>
+        <div class="flex-1 inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200 overflow-x-auto no-scrollbar">
+          <button onclick="setClassFilter('11th')" class="flex-1 min-w-[75px] px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all text-center whitespace-nowrap ${state.selectedClass === '11th' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
             Class 11th
           </button>
-          <button onclick="setClassFilter('12th')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedClass === '12th' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
+          <button onclick="setClassFilter('12th')" class="flex-1 min-w-[75px] px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all text-center whitespace-nowrap ${state.selectedClass === '12th' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
             Class 12th
           </button>
-          <button onclick="setClassFilter('All')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedClass === 'All' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
-            All Classes
+          <button onclick="setClassFilter('All')" class="flex-1 min-w-[70px] px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all text-center whitespace-nowrap ${state.selectedClass === 'All' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
+            All
           </button>
         </div>
       </div>
 
-      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Medium:</span>
-        <div class="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
-          <button onclick="setMediumFilter('EM')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedMedium === 'EM' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
+      <div class="flex items-center gap-2 w-full md:w-auto">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex-shrink-0">Medium:</span>
+        <div class="flex-1 inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200 overflow-x-auto no-scrollbar">
+          <button onclick="setMediumFilter('EM')" class="flex-1 min-w-[75px] px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all text-center whitespace-nowrap ${state.selectedMedium === 'EM' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
             EM (English)
           </button>
-          <button onclick="setMediumFilter('GM')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedMedium === 'GM' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
+          <button onclick="setMediumFilter('GM')" class="flex-1 min-w-[75px] px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all text-center whitespace-nowrap ${state.selectedMedium === 'GM' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
             GM (Gujarati)
           </button>
-          <button onclick="setMediumFilter('All')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedMedium === 'All' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
-            All Mediums
+          <button onclick="setMediumFilter('All')" class="flex-1 min-w-[70px] px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all text-center whitespace-nowrap ${state.selectedMedium === 'All' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
+            All
           </button>
         </div>
       </div>
@@ -170,22 +170,22 @@ function renderFilterBar() {
 // SIDEBAR
 function renderSidebar() {
   const navItems = [
-    { id: 'exams', label: 'Exams & Answer Keys', icon: 'file-text' },
-    { id: 'omr_generator', label: 'OMR Sheet Generator', icon: 'printer' },
-    { id: 'omr_scanner', label: 'Mobile OMR Scanner', icon: 'scan-line' },
+    { id: 'exams', label: 'Exams & Keys', icon: 'file-text' },
+    { id: 'omr_generator', label: 'OMR Generator', icon: 'printer' },
+    { id: 'omr_scanner', label: 'Mobile Scanner', icon: 'scan-line' },
     { id: 'results', label: 'Result Dashboard', icon: 'bar-chart-3' },
     { id: 'students', label: 'Student Directory', icon: 'users' },
   ];
 
   return `
     <aside class="w-full md:w-64 flex-shrink-0">
-      <div class="bg-white border border-slate-200 shadow-sm rounded-xl p-3 sm:p-4 flex md:flex-col flex-row overflow-x-auto gap-1.5 sticky top-20">
+      <div class="bg-white border border-slate-200 shadow-sm rounded-xl p-2 sm:p-4 flex md:flex-col flex-row overflow-x-auto no-scrollbar gap-1.5 sticky top-16 md:top-20 z-40">
         <div class="hidden md:block px-3 py-2 text-[11px] font-bold tracking-wider text-slate-500 uppercase border-b border-slate-100 mb-1">
           School Navigation
         </div>
         ${navItems.map(item => `
           <button onclick="navigateTo('${item.id}')" 
-                  class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${
+                  class="flex items-center gap-2 px-3 py-2.5 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap flex-shrink-0 transition-all ${
                     state.currentView === item.id 
                       ? 'bg-blue-700 text-white shadow-sm shadow-blue-700/30' 
                       : 'text-slate-700 hover:bg-slate-100 hover:text-blue-700'
@@ -220,19 +220,19 @@ function renderExamsView() {
   });
 
   return `
-    <div class="space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+    <div class="space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h2 class="text-2xl font-bold text-slate-900">Exam Management</h2>
-          <p class="text-xs sm:text-sm text-slate-600">Showing Exams for: <strong>Class ${state.selectedClass}</strong> | <strong>${state.selectedMedium} Medium</strong></p>
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-900">Exam Management</h2>
+          <p class="text-xs text-slate-600 mt-0.5">Showing Exams for: <strong>Class ${state.selectedClass}</strong> | <strong>${state.selectedMedium} Medium</strong></p>
         </div>
-        <button onclick="openCreateExamModal()" class="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm shadow-md">
+        <button onclick="openCreateExamModal()" class="btn-primary px-4 py-2.5 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-md w-full sm:w-auto">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>Create New Exam</span>
         </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         ${filteredExams.length === 0 ? `
           <div class="col-span-full bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500 shadow-sm">
             <i data-lucide="folder-open" class="w-12 h-12 mx-auto text-blue-600/40 mb-3"></i>
@@ -240,8 +240,8 @@ function renderExamsView() {
             <p class="text-xs text-slate-500 mt-1">Select another class/medium or click "Create New Exam".</p>
           </div>
         ` : filteredExams.map(exam => `
-          <div class="bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm hover:border-blue-500 hover:shadow-md transition-all">
-            <div class="flex items-start justify-between">
+          <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 space-y-4 shadow-sm hover:border-blue-500 hover:shadow-md transition-all">
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div>
                 <div class="flex items-center gap-1.5 mb-1.5 flex-wrap">
                   <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
@@ -257,28 +257,28 @@ function renderExamsView() {
                     ${exam.subject}
                   </span>
                 </div>
-                <h3 class="text-lg font-bold text-slate-900 leading-snug">${exam.exam_name}</h3>
+                <h3 class="text-base sm:text-lg font-bold text-slate-900 leading-snug">${exam.exam_name}</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Date: ${exam.date} | Questions: ${exam.total_questions}</p>
               </div>
-              <div class="text-right">
-                <span class="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200">+${exam.marks_per_correct} / -${exam.negative_marks}</span>
+              <div class="self-start">
+                <span class="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200 inline-block">+${exam.marks_per_correct} / -${exam.negative_marks}</span>
               </div>
             </div>
 
-            <div class="flex items-center justify-between text-xs text-slate-600 pt-3 border-t border-slate-100">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600 pt-3 border-t border-slate-100">
               <div class="flex items-center gap-3">
-                <span class="bg-slate-100 px-2 py-1 rounded font-medium"><strong class="text-slate-900">${exam.scanned_count || 0}</strong> Scans</span>
-                <span class="bg-slate-100 px-2 py-1 rounded font-medium"><strong class="text-slate-900">${exam.key_count || 0}</strong> Keys</span>
+                <span class="bg-slate-100 px-2.5 py-1 rounded font-medium"><strong class="text-slate-900">${exam.scanned_count || 0}</strong> Scans</span>
+                <span class="bg-slate-100 px-2.5 py-1 rounded font-medium"><strong class="text-slate-900">${exam.key_count || 0}</strong> Keys</span>
               </div>
 
-              <div class="flex items-center gap-1.5">
-                <button onclick="editAnswerKey(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+              <div class="flex items-center gap-1.5 w-full sm:w-auto">
+                <button onclick="editAnswerKey(${exam.id})" class="flex-1 sm:flex-none justify-center px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold flex items-center gap-1 transition-colors">
                   <i data-lucide="key" class="w-3.5 h-3.5"></i> Key
                 </button>
-                <button onclick="generateOMRSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                <button onclick="generateOMRSheet(${exam.id})" class="flex-1 sm:flex-none justify-center px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 text-xs font-semibold flex items-center gap-1 transition-colors">
                   <i data-lucide="file-down" class="w-3.5 h-3.5"></i> Sheet
                 </button>
-                <button onclick="scanExamSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                <button onclick="scanExamSheet(${exam.id})" class="flex-1 sm:flex-none justify-center px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold flex items-center gap-1 transition-colors">
                   <i data-lucide="scan" class="w-3.5 h-3.5"></i> Scan
                 </button>
               </div>
@@ -293,8 +293,8 @@ function renderExamsView() {
 // IN-APP CREATE EXAM MODAL DIALOG (Fixes Laptop & Phone issue)
 function renderCreateExamModal() {
   return `
-    <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div class="bg-white border border-slate-200 rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in duration-150">
+    <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-150">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-2">
             <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
@@ -668,8 +668,12 @@ function renderOMRScannerView() {
   `;
 }
 
-// 5. RESULTS DASHBOARD VIEW (NO ROLL NO, MANUAL RANK & SCORE EDITING)
+// 5. RESULT DASHBOARD VIEW
 function renderResultsView() {
+  if (!state.selectedExam && state.exams.length > 0) {
+    state.selectedExam = state.exams[0];
+  }
+
   const filteredResults = state.results.filter(r => {
     const classMatch = state.selectedClass === 'All' || r.class_name === state.selectedClass;
     const mediumMatch = state.selectedMedium === 'All' || r.medium === state.selectedMedium;
@@ -677,17 +681,17 @@ function renderResultsView() {
   });
 
   return `
-    <div class="space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+    <div class="space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h2 class="text-2xl font-bold text-slate-900">Result Dashboard</h2>
-          <p class="text-xs sm:text-sm text-slate-600">
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-900">Result Dashboard</h2>
+          <p class="text-xs text-slate-600 mt-0.5">
             Filtering: <strong>Class ${state.selectedClass}</strong> | <strong>${state.selectedMedium} Medium</strong>
           </p>
         </div>
 
-        <div class="flex items-center gap-3">
-          <select id="resultExamSelect" onchange="onResultExamChange()" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 font-semibold outline-none">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <select id="resultExamSelect" onchange="onResultExamChange()" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 font-semibold outline-none w-full sm:w-auto truncate">
             ${state.exams.map(e => `
               <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
                 ${e.exam_name} (${e.exam_type || 'NEET'} - Class ${e.class_name || '12th'})
@@ -695,25 +699,25 @@ function renderResultsView() {
             `).join('')}
           </select>
 
-          <button onclick="exportToCSV()" class="btn-primary px-3.5 py-2 flex items-center gap-2 text-xs shadow-md">
+          <button onclick="exportToCSV()" class="btn-primary px-3.5 py-2 flex items-center justify-center gap-2 text-xs shadow-md whitespace-nowrap">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export to Excel
           </button>
         </div>
       </div>
 
       <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm text-slate-800">
-            <thead class="bg-slate-50 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200">
+        <div class="table-responsive-wrapper">
+          <table class="w-full text-left text-xs sm:text-sm text-slate-800 min-w-[650px]">
+            <thead class="bg-slate-50 text-[11px] sm:text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200">
               <tr>
-                <th class="py-3.5 px-4 text-center">Manual Rank</th>
-                <th class="py-3.5 px-4">Student Name</th>
-                <th class="py-3.5 px-4">Class</th>
-                <th class="py-3.5 px-4">Medium</th>
-                <th class="py-3.5 px-4">Obtained Marks</th>
-                <th class="py-3.5 px-4">Percentage</th>
-                <th class="py-3.5 px-4 text-center">Right / Wrong (Manual)</th>
-                <th class="py-3.5 px-4 text-center">Action</th>
+                <th class="py-3 px-3 sm:px-4 text-center">Rank</th>
+                <th class="py-3 px-3 sm:px-4">Student Name</th>
+                <th class="py-3 px-3 sm:px-4">Class</th>
+                <th class="py-3 px-3 sm:px-4">Medium</th>
+                <th class="py-3 px-3 sm:px-4">Marks</th>
+                <th class="py-3 px-3 sm:px-4">%</th>
+                <th class="py-3 px-3 sm:px-4 text-center">Right / Wrong</th>
+                <th class="py-3 px-3 sm:px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 font-medium">
@@ -727,11 +731,11 @@ function renderResultsView() {
                 const isEditing = state.editingResultId === r.id;
                 return `
                   <tr class="hover:bg-blue-50/40 transition-colors ${isEditing ? 'bg-amber-50/70' : ''}">
-                    <td class="py-3.5 px-4 text-center">
+                    <td class="py-3 px-3 sm:px-4 text-center">
                       ${isEditing ? `
-                        <input type="number" id="edit_rank_${r.id}" value="${r.rank}" class="w-16 text-center font-bold border border-amber-400 rounded p-1 text-xs bg-white">
+                        <input type="number" id="edit_rank_${r.id}" value="${r.rank}" class="w-14 text-center font-bold border border-amber-400 rounded p-1 text-xs bg-white">
                       ` : `
-                        <span class="w-8 h-8 rounded-full inline-flex items-center justify-center text-xs font-extrabold shadow-sm ${
+                        <span class="w-7 h-7 sm:w-8 sm:h-8 rounded-full inline-flex items-center justify-center text-xs font-extrabold shadow-sm ${
                           r.rank === 1 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
                           r.rank === 2 ? 'bg-slate-200 text-slate-800 border border-slate-300' :
                           r.rank === 3 ? 'bg-amber-200/60 text-amber-900 border border-amber-400' : 'text-blue-800 bg-blue-50 border border-blue-200'
@@ -741,28 +745,28 @@ function renderResultsView() {
                       `}
                     </td>
 
-                    <td class="py-3.5 px-4 font-bold text-slate-900">
+                    <td class="py-3 px-3 sm:px-4 font-bold text-slate-900">
                       ${isEditing ? `
                         <input type="text" id="edit_name_${r.id}" value="${r.name || r.student_name}" class="w-full font-bold border border-amber-400 rounded p-1 text-xs bg-white">
                       ` : (r.name || r.student_name)}
                     </td>
 
-                    <td class="py-3.5 px-4 text-xs font-bold text-slate-700">
-                      <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                    <td class="py-3 px-3 sm:px-4 text-xs font-bold text-slate-700">
+                      <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 whitespace-nowrap">
                         Class ${r.class_name || '12th'}
                       </span>
                     </td>
 
-                    <td class="py-3.5 px-4 text-xs font-bold text-slate-700">
-                      <span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
+                    <td class="py-3 px-3 sm:px-4 text-xs font-bold text-slate-700">
+                      <span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 whitespace-nowrap">
                         ${r.medium || 'EM'} Medium
                       </span>
                     </td>
 
-                    <td class="py-3.5 px-4 font-mono font-extrabold text-emerald-700">
+                    <td class="py-3 px-3 sm:px-4 font-mono font-extrabold text-emerald-700 whitespace-nowrap">
                       ${isEditing ? `
                         <div class="flex items-center gap-1">
-                          <input type="number" step="0.5" id="edit_marks_${r.id}" value="${r.obtained_marks}" class="w-16 font-mono font-bold border border-amber-400 rounded p-1 text-xs bg-white text-emerald-700">
+                          <input type="number" step="0.5" id="edit_marks_${r.id}" value="${r.obtained_marks}" class="w-14 font-mono font-bold border border-amber-400 rounded p-1 text-xs bg-white text-emerald-700">
                           <span class="text-xs text-slate-500">/ ${r.total_marks || 120}</span>
                         </div>
                       ` : `
@@ -770,37 +774,37 @@ function renderResultsView() {
                       `}
                     </td>
 
-                    <td class="py-3.5 px-4 font-bold text-slate-900">
+                    <td class="py-3 px-3 sm:px-4 font-bold text-slate-900">
                       ${r.percentage}%
                     </td>
 
-                    <td class="py-3.5 px-4 text-center text-xs font-mono">
+                    <td class="py-3 px-3 sm:px-4 text-center text-xs font-mono whitespace-nowrap">
                       ${isEditing ? `
                         <div class="flex items-center justify-center gap-1">
                           <span class="text-emerald-700 font-bold">✅</span>
-                          <input type="number" id="edit_correct_${r.id}" value="${r.correct_count}" class="w-12 text-center font-bold border border-emerald-400 rounded p-1 text-xs bg-emerald-50 text-emerald-800">
+                          <input type="number" id="edit_correct_${r.id}" value="${r.correct_count}" class="w-10 text-center font-bold border border-emerald-400 rounded p-1 text-xs bg-emerald-50 text-emerald-800">
                           <span class="text-slate-400">/</span>
                           <span class="text-red-700 font-bold">❌</span>
-                          <input type="number" id="edit_wrong_${r.id}" value="${r.wrong_count}" class="w-12 text-center font-bold border border-red-400 rounded p-1 text-xs bg-red-50 text-red-800">
+                          <input type="number" id="edit_wrong_${r.id}" value="${r.wrong_count}" class="w-10 text-center font-bold border border-red-400 rounded p-1 text-xs bg-red-50 text-red-800">
                         </div>
                       ` : `
-                        <span class="text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200">${r.correct_count} ✅</span>
-                        <span class="text-slate-400 mx-1">/</span>
-                        <span class="text-red-700 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">${r.wrong_count} ❌</span>
+                        <span class="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">${r.correct_count} ✅</span>
+                        <span class="text-slate-400 mx-0.5">/</span>
+                        <span class="text-red-700 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-200">${r.wrong_count} ❌</span>
                       `}
                     </td>
 
-                    <td class="py-3.5 px-4 text-center">
+                    <td class="py-3 px-3 sm:px-4 text-center">
                       ${isEditing ? `
-                        <button onclick="saveManualResult(${r.id})" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm">
+                        <button onclick="saveManualResult(${r.id})" class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm">
                           Save
                         </button>
                         <button onclick="cancelEditResult()" class="px-2 py-1 rounded bg-slate-200 text-slate-700 text-xs font-medium ml-1">
                           Cancel
                         </button>
                       ` : `
-                        <button onclick="enableEditResult(${r.id})" class="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold flex items-center gap-1 mx-auto">
-                          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Manual Edit
+                        <button onclick="enableEditResult(${r.id})" class="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold flex items-center gap-1 mx-auto whitespace-nowrap">
+                          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit
                         </button>
                       `}
                     </td>
@@ -824,26 +828,26 @@ function renderStudentsView() {
   });
 
   return `
-    <div class="space-y-6">
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <h2 class="text-2xl font-bold text-slate-900">Student Directory</h2>
-        <p class="text-xs sm:text-sm text-slate-600">Showing Directory for: <strong>Class ${state.selectedClass}</strong> | Medium: <strong>${state.selectedMedium}</strong></p>
+    <div class="space-y-5">
+      <div class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm">
+        <h2 class="text-xl sm:text-2xl font-bold text-slate-900">Student Directory</h2>
+        <p class="text-xs text-slate-600 mt-0.5">Showing Directory for: <strong>Class ${state.selectedClass}</strong> | Medium: <strong>${state.selectedMedium}</strong></p>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
           ${filteredStudents.length === 0 ? `
             <div class="col-span-full text-center py-6 text-slate-500 text-xs">
               No students found for Class ${state.selectedClass} (${state.selectedMedium} Medium).
             </div>
           ` : filteredStudents.map(s => `
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
               <div>
                 <div class="flex items-center gap-1 mb-1">
                   <span class="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">Class ${s.class_name}</span>
                   <span class="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">${s.medium || 'EM'}</span>
                 </div>
-                <h4 class="font-bold text-slate-900">${s.name}</h4>
+                <h4 class="font-bold text-slate-900 text-sm">${s.name}</h4>
                 <p class="text-xs text-slate-600">Section: ${s.section || 'A'}</p>
               </div>
             </div>
