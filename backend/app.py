@@ -348,22 +348,28 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
 
         if path == "/api/auth/send-otp":
             if self._is_rate_limited():
-                self._send_error("Too many failed attempts. Please wait 15 minutes.", status=429)
+                self._send_error("Too many attempts. Please wait 15 minutes.", status=429)
                 return
 
             email = payload.get("email", "").strip()
-            password = payload.get("password", "").strip()
-            pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+            purpose = payload.get("purpose", "login").strip() # login, register, reset_password
+
+            if not email:
+                self._send_error("Email address is required", status=400)
+                return
 
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("SELECT * FROM users WHERE email = ? AND password_hash = ?", (email, pwd_hash))
+            c.execute("SELECT * FROM users WHERE email = ?", (email,))
             user = c.fetchone()
 
-            if not user and not (email == "admin@sangarsh.edu" and password in ["admin123", "admin"]):
+            if purpose == "register" and user:
                 conn.close()
-                self._record_login_attempt(success=False)
-                self._send_error("Invalid email or password", status=401)
+                self._send_error("This email is already registered. Please sign in instead.", status=400)
+                return
+            elif purpose == "reset_password" and not user and email != "admin@sangarsh.edu":
+                conn.close()
+                self._send_error("No account found with this email. Please register first.", status=400)
                 return
 
             # Generate 6-Digit OTP
@@ -380,14 +386,141 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
 
             # Dev Console Output for Testing & Verification
             print(f"==================================================")
-            print(f"🔑 [SANGARSH 2FA OTP] Email: {email} | OTP CODE: {otp_code}")
+            print(f"🔑 [SANGARSH 2FA OTP] Purpose: {purpose} | Email: {email} | OTP: {otp_code}")
             print(f"==================================================")
 
             self._send_json({
                 "message": f"6-Digit Verification Code sent to {email}",
                 "email": email,
-                "expires_in_seconds": 300,
+                "purpose": purpose,
+                "is_registered": bool(user or email == "admin@sangarsh.edu"),
                 "dev_otp": otp_code # Included for instant UI demonstration
+            })
+            return
+
+        elif path == "/api/auth/register":
+            email = payload.get("email", "").strip()
+            user_otp = payload.get("otp", "").strip()
+            name = payload.get("name", "").strip() or "Sangarsh Teacher"
+            password = payload.get("password", "").strip()
+
+            if not email or not password or not user_otp:
+                self._send_error("Email, OTP, and password are required.", status=400)
+                return
+
+            conn = get_db_connection()
+            c = conn.cursor()
+            now_ts = int(time.time())
+
+            # Verify OTP
+            c.execute(
+                """SELECT * FROM otp_codes 
+                   WHERE email = ? AND is_used = 0 AND strftime('%s', expires_at) > ?
+                   ORDER BY id DESC LIMIT 1""",
+                (email, str(now_ts))
+            )
+            otp_record = c.fetchone()
+
+            if not otp_record or otp_record["otp_code"] != user_otp:
+                conn.close()
+                self._send_error("Invalid or expired OTP code. Please try again.", status=400)
+                return
+
+            # Mark OTP as used
+            c.execute("UPDATE otp_codes SET is_used = 1 WHERE id = ?", (otp_record["id"],))
+
+            # Hash Password
+            pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+
+            # Insert or update user
+            c.execute("SELECT * FROM users WHERE email = ?", (email,))
+            existing = c.fetchone()
+            if existing:
+                c.execute("UPDATE users SET password_hash = ?, name = ? WHERE id = ?", (pwd_hash, name, existing["id"]))
+                user_id = existing["id"]
+            else:
+                c.execute("INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'Teacher')", (email, pwd_hash, name))
+                user_id = c.lastrowid
+
+            # Issue Session Token
+            token_str = f"sse_sec_{secrets.token_hex(32)}"
+            expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time() + 86400)) # 24 hrs
+
+            c.execute(
+                "INSERT INTO auth_tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
+                (token_str, user_id, expires_at)
+            )
+            conn.commit()
+            conn.close()
+
+            self._record_login_attempt(success=True)
+
+            self._send_json({
+                "token": token_str,
+                "user": {"id": user_id, "name": name, "email": email, "role": "Teacher"}
+            })
+            return
+
+        elif path == "/api/auth/reset-password":
+            email = payload.get("email", "").strip()
+            user_otp = payload.get("otp", "").strip()
+            new_password = payload.get("new_password", "").strip()
+
+            if not email or not user_otp or not new_password:
+                self._send_error("Email, OTP code, and new password are required.", status=400)
+                return
+
+            conn = get_db_connection()
+            c = conn.cursor()
+            now_ts = int(time.time())
+
+            # Verify OTP
+            c.execute(
+                """SELECT * FROM otp_codes 
+                   WHERE email = ? AND is_used = 0 AND strftime('%s', expires_at) > ?
+                   ORDER BY id DESC LIMIT 1""",
+                (email, str(now_ts))
+            )
+            otp_record = c.fetchone()
+
+            if not otp_record or otp_record["otp_code"] != user_otp:
+                conn.close()
+                self._send_error("Invalid or expired OTP code.", status=400)
+                return
+
+            # Mark OTP as used
+            c.execute("UPDATE otp_codes SET is_used = 1 WHERE id = ?", (otp_record["id"],))
+
+            # Update password
+            pwd_hash = hashlib.sha256(new_password.encode()).hexdigest()
+            c.execute("SELECT * FROM users WHERE email = ?", (email,))
+            user = c.fetchone()
+
+            if user:
+                c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pwd_hash, user["id"]))
+                user_id = user["id"]
+                user_name = user["name"]
+            else:
+                c.execute("INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, 'Sangarsh Admin', 'Admin')", (email, pwd_hash))
+                user_id = c.lastrowid
+                user_name = "Sangarsh Admin"
+
+            # Issue Session Token
+            token_str = f"sse_sec_{secrets.token_hex(32)}"
+            expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time() + 86400))
+
+            c.execute(
+                "INSERT INTO auth_tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
+                (token_str, user_id, expires_at)
+            )
+            conn.commit()
+            conn.close()
+
+            self._record_login_attempt(success=True)
+
+            self._send_json({
+                "token": token_str,
+                "user": {"id": user_id, "name": user_name, "email": email, "role": "Admin"}
             })
             return
 
@@ -434,7 +567,6 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             user_name = user["name"] if user else "Sangarsh Admin"
 
             # Issue Session Token
-            self._record_login_attempt(success=True)
             token_str = f"sse_sec_{secrets.token_hex(32)}"
             expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time() + 86400)) # 24 hrs
 
@@ -444,6 +576,8 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             )
             conn.commit()
             conn.close()
+
+            self._record_login_attempt(success=True)
 
             self._send_json({
                 "token": token_str,

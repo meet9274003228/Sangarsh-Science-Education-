@@ -24,10 +24,15 @@ const state = {
   selectedClass: '11th',
   selectedMedium: 'EM',
   // 2FA Email OTP State
-  otpStep: 1, // 1: Email/Password, 2: Enter 6-Digit OTP
+  authMode: 'login', // 'login', 'register', 'forgot_password'
+  otpStep: 1, // 1: Email/Password/Name -> 2: OTP Verification
   otpEmail: '',
   devOtpCode: null,
-  otpError: ''
+  otpError: '',
+  otpSuccessMsg: '',
+  regName: '',
+  regPassword: '',
+  resetPassword: ''
 };
 
 // Helper: Fetch with Authorization Bearer header & 401 handling
@@ -845,8 +850,9 @@ function renderStudentsView() {
   `;
 }
 
-// LOGIN SCREEN (2-STEP EMAIL OTP VERIFICATION)
+// LOGIN & REGISTRATION PORTAL (SIGN IN, REGISTER, FORGOT PASSWORD)
 function renderLogin() {
+  const mode = state.authMode;
   const isStep1 = state.otpStep === 1;
 
   return `
@@ -858,8 +864,21 @@ function renderLogin() {
           </div>
           <h2 class="text-2xl font-extrabold text-slate-900 tracking-wide">SANGARSH SCIENCE EDUCATION</h2>
           <p class="text-xs text-blue-700 font-bold uppercase tracking-wider flex items-center justify-center gap-1">
-            <i data-lucide="shield-check" class="w-4 h-4"></i> Secure 2FA Email Portal
+            <i data-lucide="shield-check" class="w-4 h-4"></i> Secure Email & OTP Portal
           </p>
+        </div>
+
+        <!-- AUTH MODE TABS -->
+        <div class="grid grid-cols-3 bg-slate-100 p-1 rounded-xl gap-1 text-center font-bold text-xs">
+          <button type="button" onclick="setAuthMode('login')" class="py-2 rounded-lg transition ${mode === 'login' ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+            🔑 Sign In
+          </button>
+          <button type="button" onclick="setAuthMode('register')" class="py-2 rounded-lg transition ${mode === 'register' ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+            📝 Register
+          </button>
+          <button type="button" onclick="setAuthMode('forgot_password')" class="py-2 rounded-lg transition ${mode === 'forgot_password' ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+            ❓ Reset
+          </button>
         </div>
 
         ${state.otpError ? `
@@ -868,22 +887,85 @@ function renderLogin() {
           </div>
         ` : ''}
 
-        ${isStep1 ? `
-          <!-- STEP 1: CREDENTIALS & REQUEST OTP -->
-          <form onsubmit="handleSendOtp(event)" class="space-y-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Registered Gmail / Email</label>
-              <input type="email" id="loginEmail" value="${state.otpEmail || 'admin@sangarsh.edu'}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Password</label>
-              <input type="password" id="loginPassword" value="admin123" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
-            </div>
+        ${state.otpSuccessMsg ? `
+          <div class="p-3 rounded-lg bg-green-50 border border-green-200 text-xs font-bold text-green-700 text-center">
+            ✅ ${state.otpSuccessMsg}
+          </div>
+        ` : ''}
 
-            <button type="submit" class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
-              <i data-lucide="send" class="w-4 h-4"></i> Send 6-Digit Gmail OTP Code
-            </button>
-          </form>
+        ${isStep1 ? `
+          <!-- MODE 1: SIGN IN -->
+          ${mode === 'login' ? `
+            <form onsubmit="handleSendOtp(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Registered Gmail / Email</label>
+                <input type="email" id="loginEmail" value="${state.otpEmail || ''}" placeholder="teacher@gmail.com" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Password</label>
+                <input type="password" id="loginPassword" value="admin123" placeholder="••••••••" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+              </div>
+
+              <button type="submit" class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-4 h-4"></i> Send 6-Digit Gmail OTP Code
+              </button>
+
+              <div class="text-right">
+                <button type="button" onclick="setAuthMode('forgot_password')" class="text-xs text-blue-700 font-bold hover:underline">
+                  Forgot Password?
+                </button>
+              </div>
+            </form>
+          ` : ''}
+
+          <!-- MODE 2: REGISTER NEW TEACHER -->
+          ${mode === 'register' ? `
+            <form onsubmit="handleSendOtp(event)" class="space-y-4">
+              <div class="bg-blue-50/70 border border-blue-200 p-3 rounded-xl text-xs text-blue-900 font-medium">
+                💡 Enter your Gmail address. We will send a 6-digit OTP code to verify your email before setting your password.
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Full Name</label>
+                <input type="text" id="regNameInput" placeholder="Meet Bharadava" value="${state.regName}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Gmail / Email Address</label>
+                <input type="email" id="loginEmail" placeholder="bharadavameet628@gmail.com" value="${state.otpEmail}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Set Password</label>
+                <input type="password" id="regPasswordInput" placeholder="Create new password" value="${state.regPassword}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+              </div>
+
+              <button type="submit" class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
+                <i data-lucide="user-plus" class="w-4 h-4"></i> Send OTP to Register
+              </button>
+            </form>
+          ` : ''}
+
+          <!-- MODE 3: FORGOT PASSWORD -->
+          ${mode === 'forgot_password' ? `
+            <form onsubmit="handleSendOtp(event)" class="space-y-4">
+              <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900 font-medium">
+                🔑 Enter your Gmail. We will send a 6-digit OTP code to verify and reset your password.
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Registered Gmail / Email</label>
+                <input type="email" id="loginEmail" placeholder="yourname@gmail.com" value="${state.otpEmail}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">New Password</label>
+                <input type="password" id="resetPasswordInput" placeholder="Enter new password" value="${state.resetPassword}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+              </div>
+
+              <button type="submit" class="btn-gold w-full py-3 text-sm font-extrabold shadow-md mt-2 flex items-center justify-center gap-2">
+                <i data-lucide="key" class="w-4 h-4"></i> Send OTP to Reset Password
+              </button>
+            </form>
+          ` : ''}
+
         ` : `
           <!-- STEP 2: ENTER 6-DIGIT OTP VERIFICATION CODE -->
           <form onsubmit="handleVerifyOtp(event)" class="space-y-5">
@@ -906,7 +988,7 @@ function renderLogin() {
             </div>
 
             <button type="submit" class="btn-gold w-full py-3 text-sm font-extrabold shadow-md flex items-center justify-center gap-2">
-              <i data-lucide="lock" class="w-4 h-4"></i> Verify OTP & Sign In
+              <i data-lucide="lock" class="w-4 h-4"></i> ${mode === 'register' ? 'Verify & Create Account' : mode === 'forgot_password' ? 'Verify & Reset Password' : 'Verify OTP & Sign In'}
             </button>
 
             <div class="flex items-center justify-between text-xs pt-1">
@@ -914,7 +996,7 @@ function renderLogin() {
                 ↻ Resend OTP Code
               </button>
               <button type="button" onclick="resetOtpStep()" class="text-slate-500 font-medium hover:underline">
-                ← Back to Login
+                ← Back
               </button>
             </div>
           </form>
@@ -1069,22 +1151,44 @@ function onSheetExamChange() {
   }
 }
 
+function setAuthMode(mode) {
+  state.authMode = mode;
+  state.otpStep = 1;
+  state.otpError = '';
+  state.otpSuccessMsg = '';
+  state.devOtpCode = null;
+  renderApp();
+}
+
 async function handleSendOtp(e) {
   if (e) e.preventDefault();
-  const emailInput = document.getElementById('loginEmail');
-  const passwordInput = document.getElementById('loginPassword');
 
-  const email = emailInput ? emailInput.value : state.otpEmail;
-  const password = passwordInput ? passwordInput.value : 'admin123';
+  const emailInput = document.getElementById('loginEmail');
+  const email = emailInput ? emailInput.value.trim() : state.otpEmail;
+
+  if (!email) {
+    state.otpError = 'Please enter your email address.';
+    renderApp();
+    return;
+  }
+
+  const regNameInput = document.getElementById('regNameInput');
+  const regPasswordInput = document.getElementById('regPasswordInput');
+  const resetPasswordInput = document.getElementById('resetPasswordInput');
+
+  if (regNameInput) state.regName = regNameInput.value.trim();
+  if (regPasswordInput) state.regPassword = regPasswordInput.value.trim();
+  if (resetPasswordInput) state.resetPassword = resetPasswordInput.value.trim();
 
   state.otpError = '';
+  state.otpSuccessMsg = '';
   state.otpEmail = email;
 
   try {
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, purpose: state.authMode })
     });
     const data = await res.json();
 
@@ -1096,6 +1200,7 @@ async function handleSendOtp(e) {
 
     state.otpStep = 2;
     state.devOtpCode = data.dev_otp || null;
+    state.otpSuccessMsg = data.message || `Verification Code sent to ${email}`;
     renderApp();
   } catch (err) {
     state.otpError = 'Failed to connect to server: ' + err.message;
@@ -1109,12 +1214,33 @@ async function handleVerifyOtp(e) {
   const otp = otpInput ? otpInput.value.trim() : '';
 
   state.otpError = '';
+  state.otpSuccessMsg = '';
+
+  let endpoint = '/api/auth/verify-otp';
+  let payload = { email: state.otpEmail, otp };
+
+  if (state.authMode === 'register') {
+    endpoint = '/api/auth/register';
+    payload = {
+      email: state.otpEmail,
+      otp: otp,
+      name: state.regName || 'Sangarsh Teacher',
+      password: state.regPassword || 'admin123'
+    };
+  } else if (state.authMode === 'forgot_password') {
+    endpoint = '/api/auth/reset-password';
+    payload = {
+      email: state.otpEmail,
+      otp: otp,
+      new_password: state.resetPassword || 'admin123'
+    };
+  }
 
   try {
-    const res = await fetch('/api/auth/verify-otp', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: state.otpEmail, otp })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
@@ -1129,6 +1255,7 @@ async function handleVerifyOtp(e) {
       state.user = data.user;
       state.otpStep = 1;
       state.devOtpCode = null;
+      state.authMode = 'login';
       localStorage.setItem('sse_token', data.token);
       localStorage.setItem('sse_user', JSON.stringify(data.user));
       await fetchExams();
@@ -1143,6 +1270,7 @@ async function handleVerifyOtp(e) {
 function resetOtpStep() {
   state.otpStep = 1;
   state.otpError = '';
+  state.otpSuccessMsg = '';
   state.devOtpCode = null;
   renderApp();
 }
