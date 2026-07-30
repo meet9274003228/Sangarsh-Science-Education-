@@ -1,20 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  --sse-navy: #0A192F;
-  --sse-navy-light: #172A45;
-  --sse-blue: #0284C7;
-  --sse-blue-accent: #38BDF8;
-  --sse-gold: #F59E0B;
-  --sse-gold-light: #FDE68A;
-  --sse-card-bg: #112240;
-  --sse-border: #233554;
+  --sse-navy: #0F172A;
+  --sse-navy-dark: #0A0F1D;
+  --sse-blue: #1D4ED8;
+  --sse-blue-light: #3B82F6;
+  --sse-blue-bg: #EFF6FF;
+  --sse-gold: #D97706;
+  --sse-gold-light: #FEF3C7;
+  --sse-bg: #F8FAFC;
+  --sse-card: #FFFFFF;
+  --sse-border: #E2E8F0;
+  --sse-text-main: #1E293B;
+  --sse-text-muted: #64748B;
 }
 
 body {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  background-color: #0B132B;
-  color: #F1F5F9;
+  background-color: var(--sse-bg);
+  color: var(--sse-text-main);
   min-height: 100vh;
   margin: 0;
   padding: 0;
@@ -25,51 +29,54 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   font-family: 'Outfit', sans-serif;
 }
 
-/* Glassmorphism Cards */
-.glass-panel {
-  background: rgba(17, 34, 64, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(56, 189, 248, 0.15);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  border-radius: 16px;
-}
-
-.glass-panel-light {
-  background: rgba(255, 255, 255, 0.95);
-  color: #0F172A;
+/* School Cards & Panels */
+.school-card {
+  background: #FFFFFF;
   border: 1px solid #E2E8F0;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  border-radius: 16px;
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  border-radius: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Glowing Accent Button */
+.school-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+}
+
+.school-card-header {
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+/* Buttons */
 .btn-primary {
-  background: linear-gradient(135deg, #0284C7 0%, #2563EB 100%);
+  background-color: #1D4ED8;
   color: #FFFFFF;
   font-weight: 600;
   border-radius: 10px;
-  transition: all 0.25s ease-in-out;
-  box-shadow: 0 4px 14px 0 rgba(2, 132, 199, 0.39);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(29, 78, 216, 0.2);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px 0 rgba(2, 132, 199, 0.55);
+  background-color: #1E40AF;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+  transform: translateY(-1px);
 }
 
 .btn-gold {
-  background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+  background-color: #D97706;
   color: #FFFFFF;
   font-weight: 600;
   border-radius: 10px;
-  transition: all 0.25s ease-in-out;
-  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.35);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2);
 }
 
 .btn-gold:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px 0 rgba(245, 158, 11, 0.5);
+  background-color: #B45309;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+  transform: translateY(-1px);
 }
 
 /* Custom Scrollbars */
@@ -79,22 +86,22 @@ h1, h2, h3, h4, h5, h6, .brand-font {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B132B;
+  background: #F1F5F9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1E293B;
+  background: #CBD5E1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #38BDF8;
+  background: #94A3B8;
 }
 
 /* Bubble Styling for Key Matrix & Scans */
 .bubble-btn {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -103,27 +110,33 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s ease;
-  border: 2px solid #334155;
-  color: #94A3B8;
-  background: #0F172A;
+  border: 2px solid #CBD5E1;
+  color: #475569;
+  background: #F8FAFC;
+}
+
+.bubble-btn:hover {
+  border-color: #1D4ED8;
+  color: #1D4ED8;
+  background: #EFF6FF;
 }
 
 .bubble-btn.selected {
-  border-color: #38BDF8;
-  background: #0284C7;
+  border-color: #1D4ED8;
+  background: #1D4ED8;
   color: #FFFFFF;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+  box-shadow: 0 2px 8px rgba(29, 78, 216, 0.35);
 }
 
 .bubble-btn.correct {
-  border-color: #22C55E;
-  background: #15803D;
+  border-color: #16A34A;
+  background: #16A34A;
   color: #FFFFFF;
 }
 
 .bubble-btn.wrong {
-  border-color: #EF4444;
-  background: #B91C1C;
+  border-color: #DC2626;
+  background: #DC2626;
   color: #FFFFFF;
 }
 
@@ -139,8 +152,8 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, #38BDF8, #22C55E, #38BDF8, transparent);
-  box-shadow: 0 0 15px #38BDF8, 0 0 8px #22C55E;
+  background: linear-gradient(90deg, transparent, #2563EB, #16A34A, #2563EB, transparent);
+  box-shadow: 0 0 10px #2563EB;
   animation: scanLine 2.5s infinite ease-in-out;
   pointer-events: none;
 }

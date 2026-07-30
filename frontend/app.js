@@ -1,9 +1,12 @@
 /**
  * Sangarsh Science Education — OMR Evaluation Application Engine
- * Frontend JavaScript Client (SPA) with Mobile Camera Capture & Itemized Evaluation
+ * Frontend JavaScript Client (SPA)
+ * Custom Features: In-App Create Exam Modal (Laptop & Mobile Fix),
+ * Board/GUJCET/NEET/JEE Marking Schemes, Subject-Wise Marks Breakdown,
+ * 2-Part Itemized Wrong Answer Analysis (Incorrect MCQ + Correct Key Option), No Roll No.
  */
 
-const API_BASE = ""; // Relative API URL
+const API_BASE = "";
 
 const state = {
   user: JSON.parse(localStorage.getItem('sse_user')) || { id: 1, name: "Sangarsh Admin", email: "admin@sangarsh.edu" },
@@ -15,10 +18,47 @@ const state = {
   students: [],
   activeAnswerKey: {},
   scanning: false,
-  lastScanResult: null
+  lastScanResult: null,
+  
+  // Custom Filters & UI Controls
+  selectedClass: '11th',
+  selectedMedium: 'EM',
+  // 2FA Email OTP State
+  otpStep: 1, // 1: Email/Password, 2: Enter 6-Digit OTP
+  otpEmail: '',
+  devOtpCode: null,
+  otpError: ''
 };
 
-// UI Initializer
+// Helper: Fetch with Authorization Bearer header & 401 handling
+async function fetchWithAuth(url, options = {}) {
+  options.headers = options.headers || {};
+  if (state.token) {
+    options.headers['Authorization'] = `Bearer ${state.token}`;
+  }
+  
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      console.warn("Session expired or unauthorized. Logging out...");
+      logout();
+      throw new Error("Unauthorized session. Please login again.");
+    }
+    return res;
+  } catch (err) {
+    throw err;
+  }
+}
+
+// Exam Presets Configuration
+const EXAM_PRESETS = {
+  Board: { marks: 1.0, negative: 0.0, defaultQuestions: 30 },
+  GUJCET: { marks: 1.0, negative: 0.25, defaultQuestions: 120 },
+  NEET: { marks: 4.0, negative: 1.0, defaultQuestions: 180 },
+  JEE: { marks: 4.0, negative: 1.0, defaultQuestions: 75 },
+  Custom: { marks: 4.0, negative: 1.0, defaultQuestions: 30 }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   renderApp();
 });
@@ -32,16 +72,17 @@ function renderApp() {
   }
 
   root.innerHTML = `
-    <!-- Main Shell -->
-    <div class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+    <div class="min-h-screen flex flex-col bg-slate-100 text-slate-800">
       ${renderHeader()}
       <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 md:p-6 gap-6">
         ${renderSidebar()}
-        <main class="flex-1 overflow-y-auto">
+        <main class="flex-1 overflow-y-auto space-y-5">
+          ${renderFilterBar()}
           ${renderMainContent()}
         </main>
       </div>
       ${renderFooter()}
+      ${state.isModalOpen ? renderCreateExamModal() : ''}
     </div>
   `;
 
@@ -49,29 +90,29 @@ function renderApp() {
   attachEvents();
 }
 
-// HEADER COMPONENT
+// HEADER
 function renderHeader() {
   return `
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50 border-b-2 border-amber-500">
       <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3 cursor-pointer" onclick="navigateTo('exams')">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-700 flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-sky-500/20 border border-sky-400/30">
+        <div class="flex items-center gap-3.5 cursor-pointer" onclick="navigateTo('exams')">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-700 to-slate-900 flex items-center justify-center font-extrabold text-amber-400 text-xl shadow-md border border-amber-500/40">
             SSE
           </div>
           <div>
-            <h1 class="text-base sm:text-lg font-bold text-white tracking-wide leading-tight">SANGARSH SCIENCE EDUCATION</h1>
-            <p class="text-xs text-sky-400 font-medium">11th & 12th OMR Evaluation Portal</p>
+            <h1 class="text-base sm:text-lg font-extrabold text-white tracking-wide leading-tight">SANGARSH SCIENCE EDUCATION</h1>
+            <p class="text-xs text-amber-400 font-semibold tracking-wide">OMR Evaluation Portal</p>
           </div>
         </div>
 
         <div class="flex items-center gap-3">
-          <div class="hidden sm:flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+          <div class="hidden sm:flex items-center gap-2 bg-slate-800/90 px-3.5 py-1.5 rounded-lg border border-slate-700">
             <i data-lucide="user-check" class="w-4 h-4 text-emerald-400"></i>
             <span class="text-xs font-semibold text-slate-200">${state.user.name}</span>
-            <span class="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded font-mono">ADMIN</span>
+            <span class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-mono font-bold">ADMIN</span>
           </div>
 
-          <button onclick="logout()" class="p-2 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors" title="Logout">
+          <button onclick="logout()" class="p-2 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 transition-colors" title="Logout">
             <i data-lucide="log-out" class="w-4 h-4"></i>
           </button>
         </div>
@@ -80,7 +121,44 @@ function renderHeader() {
   `;
 }
 
-// SIDEBAR COMPONENT
+// FILTER BAR
+function renderFilterBar() {
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Class:</span>
+        <div class="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
+          <button onclick="setClassFilter('11th')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedClass === '11th' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
+            Class 11th
+          </button>
+          <button onclick="setClassFilter('12th')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedClass === '12th' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
+            Class 12th
+          </button>
+          <button onclick="setClassFilter('All')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedClass === 'All' ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-700 hover:text-blue-700'}">
+            All Classes
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Medium:</span>
+        <div class="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
+          <button onclick="setMediumFilter('EM')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedMedium === 'EM' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
+            EM (English)
+          </button>
+          <button onclick="setMediumFilter('GM')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedMedium === 'GM' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
+            GM (Gujarati)
+          </button>
+          <button onclick="setMediumFilter('All')" class="px-3 py-1 rounded-md text-xs font-bold transition-all ${state.selectedMedium === 'All' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-700 hover:text-amber-600'}">
+            All Mediums
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// SIDEBAR
 function renderSidebar() {
   const navItems = [
     { id: 'exams', label: 'Exams & Answer Keys', icon: 'file-text' },
@@ -92,16 +170,18 @@ function renderSidebar() {
 
   return `
     <aside class="w-full md:w-64 flex-shrink-0">
-      <div class="glass-panel p-3 sm:p-4 flex md:flex-col flex-row overflow-x-auto gap-2 sticky top-20">
-        <div class="hidden md:block px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 uppercase">Navigation</div>
+      <div class="bg-white border border-slate-200 shadow-sm rounded-xl p-3 sm:p-4 flex md:flex-col flex-row overflow-x-auto gap-1.5 sticky top-20">
+        <div class="hidden md:block px-3 py-2 text-[11px] font-bold tracking-wider text-slate-500 uppercase border-b border-slate-100 mb-1">
+          School Navigation
+        </div>
         ${navItems.map(item => `
           <button onclick="navigateTo('${item.id}')" 
-                  class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-medium text-xs sm:text-sm whitespace-nowrap transition-all ${
+                  class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${
                     state.currentView === item.id 
-                      ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' 
-                      : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                      ? 'bg-blue-700 text-white shadow-sm shadow-blue-700/30' 
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-blue-700'
                   }">
-            <i data-lucide="${item.icon}" class="w-4 h-4 ${state.currentView === item.id ? 'text-white' : 'text-sky-400'}"></i>
+            <i data-lucide="${item.icon}" class="w-4 h-4 ${state.currentView === item.id ? 'text-white' : 'text-blue-600'}"></i>
             <span>${item.label}</span>
           </button>
         `).join('')}
@@ -110,79 +190,87 @@ function renderSidebar() {
   `;
 }
 
-// MAIN CONTENT ROUTER
 function renderMainContent() {
   switch (state.currentView) {
-    case 'exams':
-      return renderExamsView();
-    case 'answer_key':
-      return renderAnswerKeyView();
-    case 'omr_generator':
-      return renderOMRGeneratorView();
-    case 'omr_scanner':
-      return renderOMRScannerView();
-    case 'results':
-      return renderResultsView();
-    case 'students':
-      return renderStudentsView();
-    default:
-      return renderExamsView();
+    case 'exams': return renderExamsView();
+    case 'answer_key': return renderAnswerKeyView();
+    case 'omr_generator': return renderOMRGeneratorView();
+    case 'omr_scanner': return renderOMRScannerView();
+    case 'results': return renderResultsView();
+    case 'students': return renderStudentsView();
+    default: return renderExamsView();
   }
 }
 
 // 1. EXAMS VIEW
 function renderExamsView() {
+  const filteredExams = state.exams.filter(e => {
+    const classMatch = state.selectedClass === 'All' || e.class_name === state.selectedClass;
+    const mediumMatch = state.selectedMedium === 'All' || e.medium === state.selectedMedium;
+    return classMatch && mediumMatch;
+  });
+
   return `
     <div class="space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h2 class="text-2xl font-bold text-white">11th & 12th Exam Management</h2>
-          <p class="text-sm text-slate-400">Physics, Chemistry, Mathematics & Biology Assessments.</p>
+          <h2 class="text-2xl font-bold text-slate-900">Exam Management</h2>
+          <p class="text-xs sm:text-sm text-slate-600">Showing Exams for: <strong>Class ${state.selectedClass}</strong> | <strong>${state.selectedMedium} Medium</strong></p>
         </div>
-        <button onclick="openCreateExamModal()" class="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm shadow-lg">
+        <button onclick="openCreateExamModal()" class="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm shadow-md">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>Create New Exam</span>
         </button>
       </div>
 
-      <!-- Exam List -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${state.exams.length === 0 ? `
-          <div class="col-span-full glass-panel p-8 text-center text-slate-400">
-            <i data-lucide="folder-open" class="w-12 h-12 mx-auto text-sky-400/50 mb-3"></i>
-            <p class="font-semibold text-slate-300">No Exams Found</p>
-            <p class="text-xs mt-1">Click "Create New Exam" to set up your first 11th/12th Science OMR test.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        ${filteredExams.length === 0 ? `
+          <div class="col-span-full bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500 shadow-sm">
+            <i data-lucide="folder-open" class="w-12 h-12 mx-auto text-blue-600/40 mb-3"></i>
+            <p class="font-bold text-slate-800">No Exams Found for Selected Filter</p>
+            <p class="text-xs text-slate-500 mt-1">Select another class/medium or click "Create New Exam".</p>
           </div>
-        ` : state.exams.map(exam => `
-          <div class="glass-panel p-5 space-y-4 hover:border-sky-500/40 transition-all">
+        ` : filteredExams.map(exam => `
+          <div class="bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm hover:border-blue-500 hover:shadow-md transition-all">
             <div class="flex items-start justify-between">
               <div>
-                <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 uppercase tracking-wider mb-1">
-                  ${exam.subject}
-                </span>
-                <h3 class="text-lg font-bold text-white leading-snug">${exam.exam_name}</h3>
-                <p class="text-xs text-slate-400 mt-0.5">Date: ${exam.date} | Questions: ${exam.total_questions}</p>
+                <div class="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                  <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                    ${exam.exam_type || 'NEET'} Pattern
+                  </span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                    Class ${exam.class_name || '12th'}
+                  </span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                    ${exam.medium || 'EM'} Medium
+                  </span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                    ${exam.subject}
+                  </span>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 leading-snug">${exam.exam_name}</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Date: ${exam.date} | Questions: ${exam.total_questions}</p>
               </div>
               <div class="text-right">
-                <span class="text-xs font-mono text-emerald-400 font-semibold">+${exam.marks_per_correct} / -${exam.negative_marks}</span>
+                <span class="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200">+${exam.marks_per_correct} / -${exam.negative_marks}</span>
               </div>
             </div>
 
-            <div class="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800">
-              <div class="flex items-center gap-4">
-                <span><strong class="text-slate-200">${exam.scanned_count || 0}</strong> Scans</span>
-                <span><strong class="text-slate-200">${exam.key_count || 0}</strong> Keys</span>
+            <div class="flex items-center justify-between text-xs text-slate-600 pt-3 border-t border-slate-100">
+              <div class="flex items-center gap-3">
+                <span class="bg-slate-100 px-2 py-1 rounded font-medium"><strong class="text-slate-900">${exam.scanned_count || 0}</strong> Scans</span>
+                <span class="bg-slate-100 px-2 py-1 rounded font-medium"><strong class="text-slate-900">${exam.key_count || 0}</strong> Keys</span>
               </div>
 
-              <div class="flex items-center gap-2">
-                <button onclick="editAnswerKey(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 text-xs font-semibold flex items-center gap-1.5">
-                  <i data-lucide="key" class="w-3.5 h-3.5"></i> Answer Key
+              <div class="flex items-center gap-1.5">
+                <button onclick="editAnswerKey(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                  <i data-lucide="key" class="w-3.5 h-3.5"></i> Key
                 </button>
-                <button onclick="generateOMRSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-semibold flex items-center gap-1.5">
-                  <i data-lucide="file-down" class="w-3.5 h-3.5"></i> PDF Sheet
+                <button onclick="generateOMRSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                  <i data-lucide="file-down" class="w-3.5 h-3.5"></i> Sheet
                 </button>
-                <button onclick="scanExamSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold flex items-center gap-1.5">
-                  <i data-lucide="scan" class="w-3.5 h-3.5"></i> Mobile Scan
+                <button onclick="scanExamSheet(${exam.id})" class="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                  <i data-lucide="scan" class="w-3.5 h-3.5"></i> Scan
                 </button>
               </div>
             </div>
@@ -193,43 +281,190 @@ function renderExamsView() {
   `;
 }
 
-// 2. ANSWER KEY BUILDER MATRIX
+// IN-APP CREATE EXAM MODAL DIALOG (Fixes Laptop & Phone issue)
+function renderCreateExamModal() {
+  return `
+    <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in duration-150">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+              <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900">Create New Exam</h3>
+          </div>
+          <button onclick="closeCreateExamModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form onsubmit="submitCreateExam(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Exam Name</label>
+            <input type="text" id="modalExamName" placeholder="e.g. Grand Science Assessment 2026" required class="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Exam Type / Pattern</label>
+              <select id="modalExamType" onchange="onModalPresetChange()" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-600 outline-none">
+                <option value="Board">Board (+1 / 0 neg)</option>
+                <option value="GUJCET">GUJCET (+1 / -0.25 neg)</option>
+                <option value="NEET" selected>NEET (+4 / -1.0 neg)</option>
+                <option value="JEE">JEE (+4 / -1.0 neg)</option>
+                <option value="Custom">Custom Scheme</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Subject</label>
+              <select id="modalSubject" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-600 outline-none">
+                <option value="PCB Combined">PCB Combined (Phy, Chem, Bio)</option>
+                <option value="PCM Combined">PCM Combined (Phy, Chem, Math)</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Biology">Biology</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Class</label>
+              <select id="modalClassName" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-600 outline-none">
+                <option value="11th" ${state.selectedClass === '11th' ? 'selected' : ''}>Class 11th</option>
+                <option value="12th" ${state.selectedClass === '12th' ? 'selected' : ''}>Class 12th</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Medium</label>
+              <select id="modalMedium" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:border-blue-600 outline-none">
+                <option value="EM" ${state.selectedMedium === 'EM' ? 'selected' : ''}>EM (English)</option>
+                <option value="GM" ${state.selectedMedium === 'GM' ? 'selected' : ''}>GM (Gujarati)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total MCQs</label>
+              <input type="number" id="modalTotalQ" value="30" min="5" max="200" required class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-800">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-emerald-700 uppercase mb-1">+ Correct</label>
+              <input type="number" step="0.25" id="modalMarksCorrect" value="4.0" required class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-emerald-700">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-red-700 uppercase mb-1">- Negative</label>
+              <input type="number" step="0.25" id="modalNegative" value="1.0" required class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-bold text-red-700">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onclick="closeCreateExamModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors">
+              Cancel
+            </button>
+            <button type="submit" class="btn-primary px-5 py-2 text-xs font-bold shadow-md">
+              Create & Setup Exam
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function openCreateExamModal() {
+  state.isModalOpen = true;
+  renderApp();
+}
+
+function closeCreateExamModal() {
+  state.isModalOpen = false;
+  renderApp();
+}
+
+function onModalPresetChange() {
+  const typeSelect = document.getElementById('modalExamType');
+  if (!typeSelect) return;
+  const preset = EXAM_PRESETS[typeSelect.value] || EXAM_PRESETS.Custom;
+
+  document.getElementById('modalMarksCorrect').value = preset.marks;
+  document.getElementById('modalNegative').value = preset.negative;
+  document.getElementById('modalTotalQ').value = preset.defaultQuestions;
+}
+
+async function submitCreateExam(e) {
+  e.preventDefault();
+  const exam_name = document.getElementById('modalExamName').value;
+  const exam_type = document.getElementById('modalExamType').value;
+  const subject = document.getElementById('modalSubject').value;
+  const class_name = document.getElementById('modalClassName').value;
+  const medium = document.getElementById('modalMedium').value;
+  const total_questions = parseInt(document.getElementById('modalTotalQ').value);
+  const marks_per_correct = parseFloat(document.getElementById('modalMarksCorrect').value);
+  const negative_marks = parseFloat(document.getElementById('modalNegative').value);
+
+  try {
+    const res = await fetchWithAuth('/api/exams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        exam_name,
+        exam_type,
+        subject,
+        class_name,
+        medium,
+        total_questions,
+        marks_per_correct,
+        negative_marks,
+        date: new Date().toISOString().split('T')[0]
+      })
+    });
+    const data = await res.json();
+    closeCreateExamModal();
+    await fetchExams();
+    if (data.id) {
+      await editAnswerKey(data.id);
+    }
+  } catch (err) {
+    alert("Failed to create exam: " + err.message);
+  }
+}
+
+// 2. ANSWER KEY VIEW
 function renderAnswerKeyView() {
   if (!state.selectedExam) return renderExamsView();
-
   const options = ["A", "B", "C", "D"];
   const total = state.selectedExam.total_questions;
 
   return `
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <button onclick="navigateTo('exams')" class="text-xs text-sky-400 hover:underline flex items-center gap-1 mb-1">
+          <button onclick="navigateTo('exams')" class="text-xs font-semibold text-blue-700 hover:underline flex items-center gap-1 mb-1">
             <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to Exams
           </button>
-          <h2 class="text-2xl font-bold text-white">Answer Key Matrix</h2>
-          <p class="text-sm text-slate-400">${state.selectedExam.exam_name} (${state.selectedExam.subject} - ${total} Questions)</p>
+          <h2 class="text-2xl font-bold text-slate-900">Answer Key Matrix</h2>
+          <p class="text-xs sm:text-sm text-slate-600">${state.selectedExam.exam_name} (${state.selectedExam.subject} - ${total} Questions)</p>
         </div>
-
-        <button onclick="saveAnswerKey()" class="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm">
-          <i data-lucide="check-circle" class="w-4 h-4"></i>
-          <span>Save Answer Key</span>
+        <button onclick="saveAnswerKey()" class="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm shadow-md">
+          <i data-lucide="check-circle" class="w-4 h-4"></i> Save Answer Key
         </button>
       </div>
 
-      <!-- Interactive Answer Key Grid -->
-      <div class="glass-panel p-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           ${Array.from({ length: total }, (_, i) => i + 1).map(q => {
             const currentSelected = state.activeAnswerKey[q] || "A";
             return `
-              <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                <span class="font-bold text-sm text-slate-300 w-12">Q${q}.</span>
+              <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <span class="font-bold text-sm text-slate-800 w-12">Q${q}.</span>
                 <div class="flex items-center gap-2">
                   ${options.map(opt => `
-                    <button type="button" 
-                            onclick="selectAnswerKeyOption(${q}, '${opt}')"
-                            class="bubble-btn ${currentSelected === opt ? 'selected' : ''}">
+                    <button type="button" onclick="selectAnswerKeyOption(${q}, '${opt}')" class="bubble-btn ${currentSelected === opt ? 'selected' : ''}">
                       ${opt}
                     </button>
                   `).join('')}
@@ -247,39 +482,27 @@ function renderAnswerKeyView() {
 function renderOMRGeneratorView() {
   return `
     <div class="space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold text-white">Printable OMR Sheet Generator</h2>
-        <p class="text-sm text-slate-400">Generate high-precision A4 printable bubble sheets with 4 corner alignment markers.</p>
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <h2 class="text-2xl font-bold text-slate-900">Printable OMR Sheet Generator</h2>
+        <p class="text-xs sm:text-sm text-slate-600">Generate high-precision A4 printable bubble sheets with 4 corner alignment markers.</p>
       </div>
 
-      <div class="glass-panel p-6 space-y-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Select Exam</label>
-            <select id="sheetExamSelect" onchange="onSheetExamChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-sky-500 outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Select Exam</label>
+            <select id="sheetExamSelect" onchange="onSheetExamChange()" class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none">
               ${state.exams.map(e => `
                 <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
-                  ${e.exam_name} (${e.subject} - ${e.total_questions} Qs)
+                  ${e.exam_name} (${e.exam_type || 'NEET'} - Class ${e.class_name || '12th'} - ${e.medium || 'EM'})
                 </option>
               `).join('')}
             </select>
           </div>
           <div class="flex items-end">
             <button onclick="downloadActiveOMRSheet()" class="btn-gold w-full py-2.5 flex items-center justify-center gap-2 text-sm">
-              <i data-lucide="download" class="w-4 h-4"></i>
-              <span>Download Printable A4 PDF Sheet</span>
+              <i data-lucide="download" class="w-4 h-4"></i> Download Printable A4 PDF Sheet
             </button>
-          </div>
-        </div>
-
-        <!-- Live Sheet Feature Card -->
-        <div class="border border-slate-800 rounded-2xl p-6 bg-slate-900/40 text-center space-y-4">
-          <div class="w-16 h-16 mx-auto rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
-            <i data-lucide="file-check-2" class="w-8 h-8"></i>
-          </div>
-          <div>
-            <h3 class="text-lg font-bold text-white">Certified Sangarsh Standard Layout</h3>
-            <p class="text-xs text-slate-400 max-w-md mx-auto mt-1">Includes 6-Digit Roll Number Bubble Grid, Multi-Column A/B/C/D Option Bubbles, and 4 Solid Alignment Squares for guaranteed scanning accuracy.</p>
           </div>
         </div>
       </div>
@@ -287,126 +510,147 @@ function renderOMRGeneratorView() {
   `;
 }
 
-// 4. OMR SCANNER VIEW (WITH MOBILE CAMERA CAPTURE & ITEMIZED RIGHT/WRONG ANALYSIS)
+// 4. OMR SCANNER VIEW (WITH 2-PART WRONG ANSWER BREAKDOWN & SUBJECT MARKS)
 function renderOMRScannerView() {
+  const evalData = state.lastScanResult ? state.lastScanResult.evaluation : null;
+  const wrongList = evalData ? (evalData.wrong_analysis || []) : [];
+  const subjectBreakdown = evalData ? (evalData.subject_breakdown || {}) : {};
+
   return `
     <div class="space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h2 class="text-2xl font-bold text-white">Mobile Camera OMR Scanning Engine</h2>
-          <p class="text-sm text-slate-400">Click photo directly with Mobile Camera to evaluate instantly.</p>
+          <h2 class="text-2xl font-bold text-slate-900">Mobile Camera OMR Scanner</h2>
+          <p class="text-xs sm:text-sm text-slate-600">Scan student OMR sheet to generate instant subject breakdown & wrong answer report.</p>
         </div>
 
-        <div class="flex items-center gap-3">
-          <select id="scannerExamSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
-            ${state.exams.map(e => `
-              <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
-                ${e.exam_name} (${e.subject})
-              </option>
-            `).join('')}
-          </select>
-        </div>
+        <select id="scannerExamSelect" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 font-semibold outline-none">
+          ${state.exams.map(e => `
+            <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
+              ${e.exam_name} (${e.exam_type || 'NEET'})
+            </option>
+          `).join('')}
+        </select>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Scanner Input Box -->
-        <div class="glass-panel p-6 space-y-4 flex flex-col justify-between">
-          <div class="space-y-4">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="camera" class="w-5 h-5 text-sky-400"></i>
-              Mobile Camera & Image Input
-            </h3>
-
-            <!-- Direct Mobile Camera Permission Input -->
-            <input type="file" id="omrCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelected(event)">
-            <input type="file" id="omrFileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
-
-            <!-- Big Mobile Camera Trigger Button -->
-            <button onclick="triggerMobileCamera()" class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white font-extrabold text-base shadow-xl shadow-sky-500/30 flex items-center justify-center gap-3 hover:scale-[1.02] transition-transform">
-              <i data-lucide="camera" class="w-6 h-6 animate-pulse"></i>
-              <span>📷 Click Photo with Mobile Camera</span>
-            </button>
-
-            <!-- Drop Zone for Gallery File Upload -->
-            <div id="dropZone" onclick="triggerFileUpload()" class="border-2 border-dashed border-sky-500/40 rounded-2xl p-6 text-center bg-slate-900/60 hover:bg-slate-900/80 transition-all cursor-pointer">
-              <div class="space-y-2">
-                <i data-lucide="image" class="w-8 h-8 mx-auto text-sky-400"></i>
-                <p class="font-bold text-xs text-white">Or Select OMR Photo from Gallery</p>
-              </div>
-            </div>
-
-            <!-- Instant Fast Demo Scan -->
-            <button onclick="runSimulatedScan()" class="btn-gold w-full py-2.5 flex items-center justify-center gap-2 text-xs">
-              <i data-lucide="zap" class="w-4 h-4"></i>
-              <span>Run Instant Test Scan (Roll #100001)</span>
-            </button>
-          </div>
-
-          <div class="text-xs text-slate-500 text-center pt-2 border-t border-slate-800">
-            OpenCV Corner Detection + Perspective Alignment active.
-          </div>
-        </div>
-
-        <!-- Scan Result Preview Panel -->
-        <div class="glass-panel p-6 space-y-4">
-          <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <i data-lucide="award" class="w-5 h-5 text-emerald-400"></i>
-            Live Evaluation & Right/Wrong Data
+        <!-- Input Controls -->
+        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 border-b pb-2">
+            <i data-lucide="camera" class="w-5 h-5 text-blue-700"></i> Camera & File Input
           </h3>
 
-          ${state.lastScanResult ? `
+          <input type="file" id="omrCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelected(event)">
+          <input type="file" id="omrFileInput" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
+
+          <button onclick="triggerMobileCamera()" class="w-full py-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-base shadow-md flex items-center justify-center gap-3">
+            <i data-lucide="camera" class="w-6 h-6"></i> <span>📷 Click Photo with Mobile Camera</span>
+          </button>
+
+          <button onclick="runSimulatedScan()" class="btn-gold w-full py-2.5 flex items-center justify-center gap-2 text-xs">
+            <i data-lucide="zap" class="w-4 h-4"></i> <span>Run Instant Test Scan</span>
+          </button>
+        </div>
+
+        <!-- Diagnostic & Evaluation Results -->
+        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 border-b pb-2">
+            <i data-lucide="award" class="w-5 h-5 text-emerald-600"></i> Score & Itemized Wrong MCQ Analysis
+          </h3>
+
+          ${evalData ? `
             <div class="space-y-4">
-              <!-- Score Header -->
-              <div class="p-4 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-between">
+              <!-- Total Score Summary -->
+              <div class="p-4 rounded-xl bg-slate-50 border border-emerald-300 flex items-center justify-between">
                 <div>
-                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Candidate</span>
-                  <p class="text-lg font-extrabold text-white font-mono">${state.lastScanResult.student_name}</p>
-                  <p class="text-xs text-slate-400">Roll No: <strong class="text-white font-mono">${state.lastScanResult.roll_no}</strong></p>
+                  <span class="text-[10px] font-bold text-blue-700 uppercase">Student Name</span>
+                  <p class="text-lg font-extrabold text-slate-900 font-mono">${state.lastScanResult.student_name}</p>
                 </div>
                 <div class="text-right">
-                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Score</span>
-                  <p class="text-2xl font-extrabold text-emerald-400">${state.lastScanResult.evaluation.obtained_marks} / ${state.lastScanResult.evaluation.total_marks}</p>
-                  <p class="text-xs font-semibold text-white">${state.lastScanResult.evaluation.percentage}% Marks</p>
+                  <span class="text-[10px] font-bold text-emerald-700 uppercase">Total Score</span>
+                  <p class="text-2xl font-extrabold text-emerald-700">${evalData.obtained_marks} / ${evalData.total_marks}</p>
+                  <p class="text-xs font-bold text-slate-800">${evalData.percentage}% Marks</p>
                 </div>
               </div>
 
-              <!-- Summary Badges -->
-              <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                <div class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-                  <strong class="text-base block font-bold">${state.lastScanResult.evaluation.correct_count}</strong> Correct ✅
+              <!-- Subject-Wise Marks Breakdown -->
+              ${Object.keys(subjectBreakdown).length > 0 ? `
+                <div class="bg-blue-50/60 border border-blue-200 rounded-xl p-3.5 space-y-2">
+                  <h4 class="text-xs font-bold text-blue-900 uppercase tracking-wider">Subject-Wise Separate Marks Breakdown:</h4>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    ${Object.entries(subjectBreakdown).map(([subj, sData]) => `
+                      <div class="p-2 bg-white rounded-lg border border-blue-200 text-center">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase block">${subj}</span>
+                        <strong class="text-sm font-extrabold text-blue-800">${sData.marks} / ${sData.total}</strong>
+                        <span class="text-[10px] block text-slate-600">${sData.correct}✅ | ${sData.wrong}❌</span>
+                      </div>
+                    `).join('')}
+                  </div>
                 </div>
-                <div class="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300">
-                  <strong class="text-base block font-bold">${state.lastScanResult.evaluation.wrong_count}</strong> Wrong ❌
-                </div>
-                <div class="p-2.5 rounded-lg bg-slate-800 text-slate-400">
-                  <strong class="text-base block font-bold">${state.lastScanResult.evaluation.unattempted_count}</strong> Blank ⚪
-                </div>
-              </div>
+              ` : ''}
 
-              <!-- Itemized Right / Wrong Question Matrix -->
-              <div class="space-y-2">
-                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Question-Wise Right / Wrong Analysis:</h4>
-                <div class="max-h-60 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  ${Object.entries(state.lastScanResult.evaluation.itemized || {}).map(([qNum, item]) => `
-                    <div class="p-2 rounded-lg border text-xs flex items-center justify-between ${
-                      item.status === 'CORRECT' ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' :
-                      item.status === 'WRONG' ? 'bg-rose-950/40 border-rose-500/40 text-rose-300' :
-                      'bg-slate-900 border-slate-800 text-slate-400'
-                    }">
-                      <span class="font-bold">Q${qNum}</span>
-                      <span class="font-mono font-bold">
-                        ${item.status === 'CORRECT' ? `✅ ${item.scanned}` :
-                          item.status === 'WRONG' ? `❌ ${item.scanned} (${item.correct})` : `⚪ Blank`}
-                      </span>
+              <!-- 2-PART ITEMIED WRONG ANSWER ANALYSIS -->
+              <div class="space-y-3 pt-2 border-t border-slate-200">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="alert-circle" class="w-4 h-4 text-blue-700"></i>
+                    Incorrect MCQ List & Correct Options (${wrongList.length} Wrong)
+                  </h4>
+                </div>
+
+                ${wrongList.length === 0 ? `
+                  <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 text-center">
+                    🎉 100% Correct Answers. No Wrong MCQs.
+                  </div>
+                ` : `
+                  <!-- PART 1: Itemized Wrong Answer Table with Marked vs Correct Option -->
+                  <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                    <div class="max-h-48 overflow-y-auto">
+                      <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-100 text-slate-800 font-bold border-b border-slate-200">
+                          <tr>
+                            <th class="py-2.5 px-3">MCQ No.</th>
+                            <th class="py-2.5 px-3">Subject</th>
+                            <th class="py-2.5 px-3 text-slate-700">Marked Option</th>
+                            <th class="py-2.5 px-3 text-slate-900">Correct Option</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 font-medium text-slate-800">
+                          ${wrongList.map(w => `
+                            <tr class="hover:bg-slate-50">
+                              <td class="py-2 px-3 font-bold text-slate-900">Q${w.q}</td>
+                              <td class="py-2 px-3 text-slate-600">${w.subject || 'Science'}</td>
+                              <td class="py-2 px-3 font-bold font-mono text-slate-700">
+                                Option ${w.marked}
+                              </td>
+                              <td class="py-2 px-3 font-extrabold font-mono text-blue-800">
+                                Option ${w.correct}
+                              </td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
                     </div>
-                  `).join('')}
-                </div>
+                  </div>
+
+                  <!-- PART 2: Quick Wrong Question Summary Badges -->
+                  <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                    <span class="text-[11px] font-bold text-slate-700 block uppercase">Quick Wrong Answer Key Reference:</span>
+                    <div class="flex flex-wrap gap-1.5">
+                      ${wrongList.map(w => `
+                        <span class="px-2.5 py-1 rounded bg-white border border-slate-200 text-[11px] font-mono shadow-2xs text-slate-800">
+                          <strong class="text-slate-900">Q${w.q}:</strong> ${w.marked} ➜ <strong class="text-blue-800">${w.correct}</strong>
+                        </span>
+                      `).join('')}
+                    </div>
+                  </div>
+                `}
               </div>
             </div>
           ` : `
-            <div class="h-64 flex flex-col items-center justify-center text-center text-slate-500 space-y-2">
-              <i data-lucide="scan" class="w-10 h-10 text-slate-600"></i>
-              <p class="text-xs">No scan performed yet. Click camera photo above to evaluate instantly.</p>
+            <div class="h-64 flex flex-col items-center justify-center text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+              <i data-lucide="scan" class="w-10 h-10 text-slate-400"></i>
+              <p class="text-xs font-medium text-slate-600">No scan performed yet. Click camera photo above to evaluate instantly.</p>
             </div>
           `}
         </div>
@@ -415,76 +659,145 @@ function renderOMRScannerView() {
   `;
 }
 
-// 5. RESULTS DASHBOARD VIEW
+// 5. RESULTS DASHBOARD VIEW (NO ROLL NO, MANUAL RANK & SCORE EDITING)
 function renderResultsView() {
+  const filteredResults = state.results.filter(r => {
+    const classMatch = state.selectedClass === 'All' || r.class_name === state.selectedClass;
+    const mediumMatch = state.selectedMedium === 'All' || r.medium === state.selectedMedium;
+    return classMatch && mediumMatch;
+  });
+
   return `
     <div class="space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h2 class="text-2xl font-bold text-white">11th & 12th Result Dashboard</h2>
-          <p class="text-sm text-slate-400">Class-wise rank list, percentage, & Excel download.</p>
+          <h2 class="text-2xl font-bold text-slate-900">Result Dashboard</h2>
+          <p class="text-xs sm:text-sm text-slate-600">
+            Filtering: <strong>Class ${state.selectedClass}</strong> | <strong>${state.selectedMedium} Medium</strong>
+          </p>
         </div>
 
         <div class="flex items-center gap-3">
-          <select id="resultExamSelect" onchange="onResultExamChange()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+          <select id="resultExamSelect" onchange="onResultExamChange()" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 font-semibold outline-none">
             ${state.exams.map(e => `
               <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
-                ${e.exam_name} (${e.subject})
+                ${e.exam_name} (${e.exam_type || 'NEET'} - Class ${e.class_name || '12th'})
               </option>
             `).join('')}
           </select>
 
-          <button onclick="exportToCSV()" class="btn-primary px-3.5 py-2 flex items-center gap-2 text-xs">
-            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-            <span>Export to Excel</span>
+          <button onclick="exportToCSV()" class="btn-primary px-3.5 py-2 flex items-center gap-2 text-xs shadow-md">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export to Excel
           </button>
         </div>
       </div>
 
-      <!-- Results Table -->
-      <div class="glass-panel overflow-hidden">
+      <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm text-slate-300">
-            <thead class="bg-slate-900/90 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+          <table class="w-full text-left text-sm text-slate-800">
+            <thead class="bg-slate-50 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200">
               <tr>
-                <th class="py-3.5 px-4">Rank</th>
-                <th class="py-3.5 px-4">Roll No</th>
+                <th class="py-3.5 px-4 text-center">Manual Rank</th>
                 <th class="py-3.5 px-4">Student Name</th>
                 <th class="py-3.5 px-4">Class</th>
+                <th class="py-3.5 px-4">Medium</th>
                 <th class="py-3.5 px-4">Obtained Marks</th>
                 <th class="py-3.5 px-4">Percentage</th>
-                <th class="py-3.5 px-4 text-center">Right / Wrong</th>
+                <th class="py-3.5 px-4 text-center">Right / Wrong (Manual)</th>
+                <th class="py-3.5 px-4 text-center">Action</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-800/60 font-medium">
-              ${state.results.length === 0 ? `
+            <tbody class="divide-y divide-slate-100 font-medium">
+              ${filteredResults.length === 0 ? `
                 <tr>
-                  <td colspan="7" class="py-8 text-center text-slate-500 text-xs">
-                    No evaluated results for this exam yet.
+                  <td colspan="8" class="py-8 text-center text-slate-500 text-xs">
+                    No evaluated results found for Class ${state.selectedClass} (${state.selectedMedium} Medium).
                   </td>
                 </tr>
-              ` : state.results.map((r, i) => `
-                <tr class="hover:bg-slate-800/40 transition-colors">
-                  <td class="py-3.5 px-4">
-                    <span class="w-7 h-7 rounded-full inline-flex items-center justify-center text-xs font-bold ${
-                      r.rank === 1 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
-                      r.rank === 2 ? 'bg-slate-300/20 text-slate-200 border border-slate-400/40' :
-                      r.rank === 3 ? 'bg-amber-700/20 text-amber-500 border border-amber-700/40' : 'text-slate-400'
-                    }">
-                      #${r.rank}
-                    </span>
-                  </td>
-                  <td class="py-3.5 px-4 font-mono text-sky-400 font-bold">${r.roll_no}</td>
-                  <td class="py-3.5 px-4 font-semibold text-white">${r.name || r.student_name}</td>
-                  <td class="py-3.5 px-4 text-xs text-slate-400">${r.class_name || 'Class 12'}</td>
-                  <td class="py-3.5 px-4 font-mono font-bold text-emerald-400">${r.obtained_marks} / ${r.total_marks}</td>
-                  <td class="py-3.5 px-4 font-bold text-white">${r.percentage}%</td>
-                  <td class="py-3.5 px-4 text-center text-xs font-mono">
-                    <span class="text-emerald-400 font-bold">${r.correct_count} ✅</span> / 
-                    <span class="text-rose-400 font-bold">${r.wrong_count} ❌</span>
-                  </td>
-                </tr>
-              `).join('')}
+              ` : filteredResults.map((r) => {
+                const isEditing = state.editingResultId === r.id;
+                return `
+                  <tr class="hover:bg-blue-50/40 transition-colors ${isEditing ? 'bg-amber-50/70' : ''}">
+                    <td class="py-3.5 px-4 text-center">
+                      ${isEditing ? `
+                        <input type="number" id="edit_rank_${r.id}" value="${r.rank}" class="w-16 text-center font-bold border border-amber-400 rounded p-1 text-xs bg-white">
+                      ` : `
+                        <span class="w-8 h-8 rounded-full inline-flex items-center justify-center text-xs font-extrabold shadow-sm ${
+                          r.rank === 1 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                          r.rank === 2 ? 'bg-slate-200 text-slate-800 border border-slate-300' :
+                          r.rank === 3 ? 'bg-amber-200/60 text-amber-900 border border-amber-400' : 'text-blue-800 bg-blue-50 border border-blue-200'
+                        }">
+                          #${r.rank}
+                        </span>
+                      `}
+                    </td>
+
+                    <td class="py-3.5 px-4 font-bold text-slate-900">
+                      ${isEditing ? `
+                        <input type="text" id="edit_name_${r.id}" value="${r.name || r.student_name}" class="w-full font-bold border border-amber-400 rounded p-1 text-xs bg-white">
+                      ` : (r.name || r.student_name)}
+                    </td>
+
+                    <td class="py-3.5 px-4 text-xs font-bold text-slate-700">
+                      <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                        Class ${r.class_name || '12th'}
+                      </span>
+                    </td>
+
+                    <td class="py-3.5 px-4 text-xs font-bold text-slate-700">
+                      <span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
+                        ${r.medium || 'EM'} Medium
+                      </span>
+                    </td>
+
+                    <td class="py-3.5 px-4 font-mono font-extrabold text-emerald-700">
+                      ${isEditing ? `
+                        <div class="flex items-center gap-1">
+                          <input type="number" step="0.5" id="edit_marks_${r.id}" value="${r.obtained_marks}" class="w-16 font-mono font-bold border border-amber-400 rounded p-1 text-xs bg-white text-emerald-700">
+                          <span class="text-xs text-slate-500">/ ${r.total_marks || 120}</span>
+                        </div>
+                      ` : `
+                        ${r.obtained_marks} / ${r.total_marks || 120}
+                      `}
+                    </td>
+
+                    <td class="py-3.5 px-4 font-bold text-slate-900">
+                      ${r.percentage}%
+                    </td>
+
+                    <td class="py-3.5 px-4 text-center text-xs font-mono">
+                      ${isEditing ? `
+                        <div class="flex items-center justify-center gap-1">
+                          <span class="text-emerald-700 font-bold">✅</span>
+                          <input type="number" id="edit_correct_${r.id}" value="${r.correct_count}" class="w-12 text-center font-bold border border-emerald-400 rounded p-1 text-xs bg-emerald-50 text-emerald-800">
+                          <span class="text-slate-400">/</span>
+                          <span class="text-red-700 font-bold">❌</span>
+                          <input type="number" id="edit_wrong_${r.id}" value="${r.wrong_count}" class="w-12 text-center font-bold border border-red-400 rounded p-1 text-xs bg-red-50 text-red-800">
+                        </div>
+                      ` : `
+                        <span class="text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200">${r.correct_count} ✅</span>
+                        <span class="text-slate-400 mx-1">/</span>
+                        <span class="text-red-700 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">${r.wrong_count} ❌</span>
+                      `}
+                    </td>
+
+                    <td class="py-3.5 px-4 text-center">
+                      ${isEditing ? `
+                        <button onclick="saveManualResult(${r.id})" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm">
+                          Save
+                        </button>
+                        <button onclick="cancelEditResult()" class="px-2 py-1 rounded bg-slate-200 text-slate-700 text-xs font-medium ml-1">
+                          Cancel
+                        </button>
+                      ` : `
+                        <button onclick="enableEditResult(${r.id})" class="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold flex items-center gap-1 mx-auto">
+                          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Manual Edit
+                        </button>
+                      `}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -493,25 +806,36 @@ function renderResultsView() {
   `;
 }
 
-// 6. STUDENTS DIRECTORY VIEW
+// 6. STUDENTS DIRECTORY
 function renderStudentsView() {
+  const filteredStudents = state.students.filter(s => {
+    const classMatch = state.selectedClass === 'All' || s.class_name === state.selectedClass;
+    const mediumMatch = state.selectedMedium === 'All' || s.medium === state.selectedMedium;
+    return classMatch && mediumMatch;
+  });
+
   return `
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-2xl font-bold text-white">Student Database</h2>
-          <p class="text-sm text-slate-400">11th & 12th Science Student Directory.</p>
-        </div>
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <h2 class="text-2xl font-bold text-slate-900">Student Directory</h2>
+        <p class="text-xs sm:text-sm text-slate-600">Showing Directory for: <strong>Class ${state.selectedClass}</strong> | Medium: <strong>${state.selectedMedium}</strong></p>
       </div>
 
-      <div class="glass-panel p-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          ${state.students.map(s => `
-            <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+          ${filteredStudents.length === 0 ? `
+            <div class="col-span-full text-center py-6 text-slate-500 text-xs">
+              No students found for Class ${state.selectedClass} (${state.selectedMedium} Medium).
+            </div>
+          ` : filteredStudents.map(s => `
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
               <div>
-                <span class="text-[10px] font-mono text-sky-400 font-bold">ROLL: ${s.roll_no}</span>
-                <h4 class="font-bold text-white">${s.name}</h4>
-                <p class="text-xs text-slate-400">${s.class_name} (${s.section})</p>
+                <div class="flex items-center gap-1 mb-1">
+                  <span class="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">Class ${s.class_name}</span>
+                  <span class="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">${s.medium || 'EM'}</span>
+                </div>
+                <h4 class="font-bold text-slate-900">${s.name}</h4>
+                <p class="text-xs text-slate-600">Section: ${s.section || 'A'}</p>
               </div>
             </div>
           `).join('')}
@@ -521,54 +845,114 @@ function renderStudentsView() {
   `;
 }
 
-// LOGIN SCREEN COMPONENT
+// LOGIN SCREEN (2-STEP EMAIL OTP VERIFICATION)
 function renderLogin() {
+  const isStep1 = state.otpStep === 1;
+
   return `
-    <div class="min-h-screen flex items-center justify-center p-4 bg-slate-950">
-      <div class="glass-panel w-full max-w-md p-8 space-y-6">
+    <div class="min-h-screen flex items-center justify-center p-4 bg-slate-100">
+      <div class="bg-white border border-slate-200 shadow-xl rounded-2xl w-full max-w-md p-8 space-y-6">
         <div class="text-center space-y-2">
-          <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-700 flex items-center justify-center font-extrabold text-white text-2xl shadow-xl shadow-sky-500/20 border border-sky-400/30">
+          <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-700 to-slate-900 flex items-center justify-center font-extrabold text-amber-400 text-2xl shadow-md border border-amber-500/40">
             SSE
           </div>
-          <h2 class="text-2xl font-bold text-white tracking-wide">SANGARSH SCIENCE EDUCATION</h2>
-          <p class="text-xs text-sky-400 font-medium">11th & 12th Science OMR Evaluation Portal</p>
+          <h2 class="text-2xl font-extrabold text-slate-900 tracking-wide">SANGARSH SCIENCE EDUCATION</h2>
+          <p class="text-xs text-blue-700 font-bold uppercase tracking-wider flex items-center justify-center gap-1">
+            <i data-lucide="shield-check" class="w-4 h-4"></i> Secure 2FA Email Portal
+          </p>
         </div>
 
-        <form onsubmit="handleLogin(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
-            <input type="email" id="loginEmail" value="admin@sangarsh.edu" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-sky-500 outline-none">
+        ${state.otpError ? `
+          <div class="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-bold text-red-700 text-center">
+            ⚠️ ${state.otpError}
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
-            <input type="password" id="loginPassword" value="admin123" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-sky-500 outline-none">
-          </div>
+        ` : ''}
 
-          <button type="submit" class="btn-primary w-full py-3 text-sm font-bold shadow-lg shadow-sky-600/30 mt-2">
-            Sign In to Dashboard
-          </button>
-        </form>
+        ${isStep1 ? `
+          <!-- STEP 1: CREDENTIALS & REQUEST OTP -->
+          <form onsubmit="handleSendOtp(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Registered Gmail / Email</label>
+              <input type="email" id="loginEmail" value="${state.otpEmail || 'admin@sangarsh.edu'}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Password</label>
+              <input type="password" id="loginPassword" value="admin123" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+            </div>
+
+            <button type="submit" class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
+              <i data-lucide="send" class="w-4 h-4"></i> Send 6-Digit Gmail OTP Code
+            </button>
+          </form>
+        ` : `
+          <!-- STEP 2: ENTER 6-DIGIT OTP VERIFICATION CODE -->
+          <form onsubmit="handleVerifyOtp(event)" class="space-y-5">
+            <div class="bg-blue-50/70 border border-blue-200 p-3.5 rounded-xl text-center space-y-1">
+              <span class="text-[11px] font-bold text-blue-800 uppercase block">Verification Code Sent To:</span>
+              <strong class="text-sm font-extrabold text-slate-900 block font-mono">${state.otpEmail}</strong>
+              <p class="text-[11px] text-slate-500">Check your Gmail inbox for the 6-digit OTP code.</p>
+            </div>
+
+            ${state.devOtpCode ? `
+              <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-center">
+                <span class="text-[10px] font-bold text-amber-800 uppercase block">Instant Demo OTP Code:</span>
+                <strong class="text-xl font-extrabold text-amber-900 font-mono tracking-widest">${state.devOtpCode}</strong>
+              </div>
+            ` : ''}
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 text-center">Enter 6-Digit OTP Code</label>
+              <input type="text" id="otpCodeInput" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required autofocus class="w-full text-center text-2xl font-mono font-extrabold tracking-widest bg-white border-2 border-blue-600 rounded-xl py-3 text-slate-900 outline-none shadow-sm">
+            </div>
+
+            <button type="submit" class="btn-gold w-full py-3 text-sm font-extrabold shadow-md flex items-center justify-center gap-2">
+              <i data-lucide="lock" class="w-4 h-4"></i> Verify OTP & Sign In
+            </button>
+
+            <div class="flex items-center justify-between text-xs pt-1">
+              <button type="button" onclick="handleSendOtp(null)" class="text-blue-700 font-bold hover:underline">
+                ↻ Resend OTP Code
+              </button>
+              <button type="button" onclick="resetOtpStep()" class="text-slate-500 font-medium hover:underline">
+                ← Back to Login
+              </button>
+            </div>
+          </form>
+        `}
       </div>
     </div>
   `;
 }
 
-// FOOTER COMPONENT
+// FOOTER
 function renderFooter() {
   return `
-    <footer class="border-t border-slate-800 bg-slate-950 py-4 text-center text-xs text-slate-500">
+    <footer class="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-600 font-medium">
       © 2026 Sangarsh Science Education. All rights reserved. OMR Engine v2.0
     </footer>
   `;
 }
 
-// API INTERACTION FUNCTIONS
+// CONTROLLERS
+function setClassFilter(className) {
+  state.selectedClass = className;
+  fetchExams();
+  renderApp();
+}
+
+function setMediumFilter(medium) {
+  state.selectedMedium = medium;
+  fetchExams();
+  renderApp();
+}
+
 async function fetchExams() {
   try {
-    const res = await fetch('/api/exams');
+    const url = `/api/exams?class_name=${state.selectedClass}&medium=${state.selectedMedium}`;
+    const res = await fetchWithAuth(url);
     const data = await res.json();
     state.exams = data.exams || [];
-    if (state.exams.length > 0 && !state.selectedExam) {
+    if (state.exams.length > 0 && (!state.selectedExam || !state.exams.find(e => e.id === state.selectedExam.id))) {
       state.selectedExam = state.exams[0];
       await fetchExamDetails(state.selectedExam.id);
     }
@@ -579,7 +963,7 @@ async function fetchExams() {
 
 async function fetchExamDetails(id) {
   try {
-    const res = await fetch(`/api/exams/${id}`);
+    const res = await fetchWithAuth(`/api/exams/${id}`);
     const data = await res.json();
     state.selectedExam = data;
     state.activeAnswerKey = data.answer_key || {};
@@ -591,7 +975,7 @@ async function fetchExamDetails(id) {
 
 async function fetchResults(examId) {
   try {
-    const res = await fetch(`/api/exams/${examId}/results`);
+    const res = await fetchWithAuth(`/api/exams/${examId}/results`);
     const data = await res.json();
     state.results = data.results || [];
   } catch (err) {
@@ -601,7 +985,7 @@ async function fetchResults(examId) {
 
 async function fetchStudents() {
   try {
-    const res = await fetch('/api/students');
+    const res = await fetchWithAuth(`/api/students?class_name=${state.selectedClass}&medium=${state.selectedMedium}`);
     const data = await res.json();
     state.students = data.students || [];
   } catch (err) {
@@ -609,7 +993,53 @@ async function fetchStudents() {
   }
 }
 
-// EVENT HANDLERS & NAVIGATION
+function enableEditResult(resultId) {
+  state.editingResultId = resultId;
+  renderApp();
+}
+
+function cancelEditResult() {
+  state.editingResultId = null;
+  renderApp();
+}
+
+async function saveManualResult(resultId) {
+  const resultObj = state.results.find(r => r.id === resultId);
+  if (!resultObj) return;
+
+  const newRank = parseInt(document.getElementById(`edit_rank_${resultId}`).value) || resultObj.rank;
+  const newName = document.getElementById(`edit_name_${resultId}`).value || resultObj.student_name;
+  const newMarks = parseFloat(document.getElementById(`edit_marks_${resultId}`).value) || resultObj.obtained_marks;
+  const newCorrect = parseInt(document.getElementById(`edit_correct_${resultId}`).value) || resultObj.correct_count;
+  const newWrong = parseInt(document.getElementById(`edit_wrong_${resultId}`).value) || resultObj.wrong_count;
+  
+  const totalMarks = resultObj.total_marks || 120;
+  const newPercentage = parseFloat(((newMarks / totalMarks) * 100).toFixed(1));
+
+  try {
+    await fetchWithAuth(`/api/results/${resultId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        manual_rank: newRank,
+        student_name: newName,
+        obtained_marks: newMarks,
+        correct_count: newCorrect,
+        wrong_count: newWrong,
+        percentage: newPercentage
+      })
+    });
+
+    state.editingResultId = null;
+    if (state.selectedExam) {
+      await fetchResults(state.selectedExam.id);
+    }
+    renderApp();
+  } catch (err) {
+    alert('Failed to update result: ' + err.message);
+  }
+}
+
 function navigateTo(view) {
   state.currentView = view;
   if (view === 'exams') fetchExams();
@@ -618,29 +1048,103 @@ function navigateTo(view) {
   renderApp();
 }
 
-async function handleLogin(e) {
-  e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
+function onResultExamChange() {
+  const select = document.getElementById('resultExamSelect');
+  if (select && select.value) {
+    const examId = parseInt(select.value);
+    const exam = state.exams.find(e => e.id === examId);
+    if (exam) {
+      state.selectedExam = exam;
+      fetchResults(examId).then(() => renderApp());
+    }
+  }
+}
+
+function onSheetExamChange() {
+  const select = document.getElementById('sheetExamSelect');
+  if (select && select.value) {
+    const examId = parseInt(select.value);
+    const exam = state.exams.find(e => e.id === examId);
+    if (exam) state.selectedExam = exam;
+  }
+}
+
+async function handleSendOtp(e) {
+  if (e) e.preventDefault();
+  const emailInput = document.getElementById('loginEmail');
+  const passwordInput = document.getElementById('loginPassword');
+
+  const email = emailInput ? emailInput.value : state.otpEmail;
+  const password = passwordInput ? passwordInput.value : 'admin123';
+
+  state.otpError = '';
+  state.otpEmail = email;
 
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
+
+    if (!res.ok) {
+      state.otpError = data.error || 'Failed to send OTP';
+      renderApp();
+      return;
+    }
+
+    state.otpStep = 2;
+    state.devOtpCode = data.dev_otp || null;
+    renderApp();
+  } catch (err) {
+    state.otpError = 'Failed to connect to server: ' + err.message;
+    renderApp();
+  }
+}
+
+async function handleVerifyOtp(e) {
+  if (e) e.preventDefault();
+  const otpInput = document.getElementById('otpCodeInput');
+  const otp = otpInput ? otpInput.value.trim() : '';
+
+  state.otpError = '';
+
+  try {
+    const res = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: state.otpEmail, otp })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      state.otpError = data.error || 'Invalid OTP code';
+      renderApp();
+      return;
+    }
+
     if (data.token) {
       state.token = data.token;
       state.user = data.user;
+      state.otpStep = 1;
+      state.devOtpCode = null;
       localStorage.setItem('sse_token', data.token);
       localStorage.setItem('sse_user', JSON.stringify(data.user));
       await fetchExams();
       renderApp();
     }
   } catch (err) {
-    alert('Login Failed: ' + err.message);
+    state.otpError = 'Verification Error: ' + err.message;
+    renderApp();
   }
+}
+
+function resetOtpStep() {
+  state.otpStep = 1;
+  state.otpError = '';
+  state.devOtpCode = null;
+  renderApp();
 }
 
 function logout() {
@@ -663,7 +1167,7 @@ function selectAnswerKeyOption(questionNo, option) {
 async function saveAnswerKey() {
   if (!state.selectedExam) return;
   try {
-    await fetch(`/api/exams/${state.selectedExam.id}/answer-key`, {
+    await fetchWithAuth(`/api/exams/${state.selectedExam.id}/answer-key`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answer_key: state.activeAnswerKey })
@@ -705,8 +1209,7 @@ async function runSimulatedScan() {
   const select = document.getElementById('scannerExamSelect');
   const examId = select ? select.value : (state.selectedExam ? state.selectedExam.id : 1);
 
-  // Generate realistic scanned answers matching key with itemized status
-  const examRes = await fetch(`/api/exams/${examId}`);
+  const examRes = await fetchWithAuth(`/api/exams/${examId}`);
   const examData = await examRes.json();
   const key = examData.answer_key || {};
 
@@ -722,7 +1225,7 @@ async function runSimulatedScan() {
     answers: scanned
   };
 
-  const res = await fetch(`/api/exams/${examId}/scan`, {
+  const res = await fetchWithAuth(`/api/exams/${examId}/scan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -739,29 +1242,7 @@ function exportToCSV() {
   window.open(`/api/export/excel?exam_id=${examId}`, '_blank');
 }
 
-function openCreateExamModal() {
-  const exam_name = prompt("Enter Exam Name:", "12th Physics Chapterwise Assessment");
-  if (!exam_name) return;
-  const subject = prompt("Enter Subject (Physics / Chemistry / Mathematics / Biology):", "Physics");
-  if (!subject) return;
-
-  fetch('/api/exams', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      exam_name,
-      subject,
-      total_questions: 30,
-      marks_per_correct: 4.0,
-      negative_marks: 1.0,
-      date: new Date().toISOString().split('T')[0]
-    })
-  }).then(() => fetchExams()).then(() => renderApp());
-}
-
-function attachEvents() {
-  // Event listeners for inputs
-}
+function attachEvents() {}
 
 function handleFileSelected(e) {
   if (e.target.files && e.target.files[0]) {
@@ -769,7 +1250,6 @@ function handleFileSelected(e) {
   }
 }
 
-// Initial Data Load
 if (state.token) {
   fetchExams();
 }

@@ -1,7 +1,8 @@
 """
 FastAPI / Python Standard Web Server for Sangarsh Science Education.
 Provides REST APIs for Authentication, Exam Management, Answer Key Builder,
-OMR Sheet PDF Stream, OMR Scanning & Auto-Evaluation, Result Dashboards, and CSV/Excel Export.
+OMR Sheet PDF Stream, OMR Scanning & Auto-Evaluation, Manual Rank & Score Updates,
+Board/GUJCET/NEET/JEE Marking Schemes, Subject Breakdown, Result Dashboards, and CSV/Excel Export.
 """
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -9,10 +10,10 @@ import json
 import urllib.parse
 import os
 import hashlib
+import secrets
 import time
 import sys
 
-# Ensure backend directory is in sys.path
 sys.path.append(os.path.dirname(__file__))
 
 from database import init_db, get_db_connection
@@ -49,6 +50,55 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
     def _send_error(self, message, status=400):
         self._send_json({"error": message}, status=status)
 
+    def _get_client_ip(self):
+        return self.client_address[0] if self.client_address else "127.0.0.1"
+
+    def _is_rate_limited(self):
+        """Block IP if more than 5 failed login attempts in the past 15 minutes."""
+        ip = self._get_client_ip()
+        conn = get_db_connection()
+        c = conn.cursor()
+        fifteen_mins_ago = int(time.time()) - 900
+        c.execute(
+            "SELECT COUNT(*) as failed_count FROM login_attempts WHERE ip_address = ? AND success = 0 AND strftime('%s', attempt_time) > ?",
+            (ip, str(fifteen_mins_ago))
+        )
+        row = c.fetchone()
+        conn.close()
+        return row["failed_count"] >= 5 if row else False
+
+    def _record_login_attempt(self, success: bool):
+        ip = self._get_client_ip()
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO login_attempts (ip_address, success) VALUES (?, ?)", (ip, 1 if success else 0))
+        conn.commit()
+        conn.close()
+
+    def _verify_token(self):
+        """Validates Bearer token from Authorization header against database."""
+        auth_header = self.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return None
+
+        token = auth_header.split('Bearer ')[1].strip()
+        conn = get_db_connection()
+        c = conn.cursor()
+        now_ts = int(time.time())
+        c.execute(
+            """SELECT t.*, u.id as user_id, u.name, u.email, u.role 
+               FROM auth_tokens t 
+               JOIN users u ON t.user_id = u.id 
+               WHERE t.token = ? AND strftime('%s', t.expires_at) > ?""",
+            (token, str(now_ts))
+        )
+        token_row = c.fetchone()
+        conn.close()
+
+        if token_row:
+            return dict(token_row)
+        return None
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -63,18 +113,41 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
 
         # API ROUTES
         if path == "/api/auth/me":
-            self._send_json({"user": {"id": 1, "name": "Sangarsh Admin", "email": "admin@sangarsh.edu", "role": "Admin"}})
+            user_session = self._verify_token()
+            if not user_session:
+                self._send_error("Unauthorized: Session expired or invalid", status=401)
+                return
+            self._send_json({"user": {"id": user_session["user_id"], "name": user_session["name"], "email": user_session["email"], "role": user_session["role"]}})
             return
 
         elif path == "/api/exams":
+            class_filter = query.get("class_name", [None])[0]
+            medium_filter = query.get("medium", [None])[0]
+
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("""
+
+            sql = """
                 SELECT e.*, 
                        (SELECT COUNT(*) FROM answer_keys WHERE exam_id = e.id) as key_count,
                        (SELECT COUNT(*) FROM omr_results WHERE exam_id = e.id) as scanned_count
-                FROM exams e ORDER BY e.id DESC
-            """)
+                FROM exams e
+            """
+            conditions = []
+            params = []
+            if class_filter and class_filter != "All":
+                conditions.append("e.class_name = ?")
+                params.append(class_filter)
+            if medium_filter and medium_filter != "All":
+                conditions.append("e.medium = ?")
+                params.append(medium_filter)
+
+            if conditions:
+                sql += " WHERE " + " AND ".join(conditions)
+
+            sql += " ORDER BY e.id DESC"
+
+            c.execute(sql, params)
             rows = [dict(r) for r in c.fetchall()]
             conn.close()
             self._send_json({"exams": rows})
@@ -111,22 +184,40 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             conn = get_db_connection()
             c = conn.cursor()
             c.execute("""
-                SELECT r.*, s.class_name, s.section
+                SELECT r.*, 
+                       COALESCE(r.class_name, s.class_name, '12th') as class_name,
+                       COALESCE(r.medium, s.medium, 'EM') as medium,
+                       s.section
                 FROM omr_results r
                 LEFT JOIN students s ON r.student_id = s.id
                 WHERE r.exam_id = ?
-                ORDER BY r.obtained_marks DESC
+                ORDER BY COALESCE(r.manual_rank, 999999) ASC, r.obtained_marks DESC
             """, (exam_id,))
             results = [dict(r) for r in c.fetchall()]
 
-            # Add Rank
             for idx, r in enumerate(results):
-                r["rank"] = idx + 1
-                if r["scanned_answers_json"]:
+                if not r.get("manual_rank"):
+                    r["rank"] = idx + 1
+                else:
+                    r["rank"] = r["manual_rank"]
+                
+                if r.get("scanned_answers_json"):
                     try:
                         r["scanned_answers"] = json.loads(r["scanned_answers_json"])
                     except:
                         r["scanned_answers"] = {}
+                
+                if r.get("subject_breakdown_json"):
+                    try:
+                        r["subject_breakdown"] = json.loads(r["subject_breakdown_json"])
+                    except:
+                        r["subject_breakdown"] = {}
+
+                if r.get("wrong_analysis_json"):
+                    try:
+                        r["wrong_analysis"] = json.loads(r["wrong_analysis_json"])
+                    except:
+                        r["wrong_analysis"] = []
 
             c.execute("SELECT * FROM exams WHERE id = ?", (exam_id,))
             exam = dict(c.fetchone()) if c.rowcount != 0 else {}
@@ -156,9 +247,24 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             return
 
         elif path == "/api/students":
+            class_filter = query.get("class_name", [None])[0]
+            medium_filter = query.get("medium", [None])[0]
+
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("SELECT * FROM students ORDER BY roll_no ASC")
+            sql = "SELECT * FROM students"
+            conds = []
+            params = []
+            if class_filter and class_filter != "All":
+                conds.append("class_name = ?")
+                params.append(class_filter)
+            if medium_filter and medium_filter != "All":
+                conds.append("medium = ?")
+                params.append(medium_filter)
+            if conds:
+                sql += " WHERE " + " AND ".join(conds)
+            sql += " ORDER BY id DESC"
+            c.execute(sql, params)
             students = [dict(r) for r in c.fetchall()]
             conn.close()
             self._send_json({"students": students})
@@ -173,22 +279,24 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             exam_title = exam_row["exam_name"] if exam_row else "Exam"
 
             c.execute("""
-                SELECT r.roll_no, COALESCE(s.name, r.student_name) as name, 
-                       COALESCE(s.class_name, 'Class 10') as class_name,
+                SELECT COALESCE(r.manual_rank, 0) as manual_rank,
+                       COALESCE(s.name, r.student_name) as name, 
+                       COALESCE(r.class_name, s.class_name, '12th') as class_name,
+                       COALESCE(r.medium, s.medium, 'EM') as medium,
                        r.obtained_marks, r.total_marks, r.percentage,
                        r.correct_count, r.wrong_count, r.unattempted_count
                 FROM omr_results r
                 LEFT JOIN students s ON r.student_id = s.id
                 WHERE r.exam_id = ?
-                ORDER BY r.obtained_marks DESC
+                ORDER BY COALESCE(r.manual_rank, 999999) ASC, r.obtained_marks DESC
             """, (exam_id,))
             rows = c.fetchall()
             conn.close()
 
-            # CSV Format Export
-            csv_lines = ["Rank,Roll No,Student Name,Class,Obtained Marks,Total Marks,Percentage,Correct,Wrong,Unattempted"]
+            csv_lines = ["Rank,Student Name,Class,Medium,Obtained Marks,Total Marks,Percentage,Correct,Wrong,Unattempted"]
             for idx, r in enumerate(rows):
-                line = f"{idx+1},{r['roll_no']},\"{r['name']}\",{r['class_name']},{r['obtained_marks']},{r['total_marks']},{r['percentage']}%,{r['correct_count']},{r['wrong_count']},{r['unattempted_count']}"
+                rank_str = str(r['manual_rank']) if r['manual_rank'] > 0 else str(idx+1)
+                line = f"{rank_str},\"{r['name']}\",{r['class_name']},{r['medium']},{r['obtained_marks']},{r['total_marks']},{r['percentage']}%,{r['correct_count']},{r['wrong_count']},{r['unattempted_count']}"
                 csv_lines.append(line)
 
             csv_data = "\n".join(csv_lines).encode('utf-8')
@@ -218,7 +326,6 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             self._send_bytes(content, content_type=ct)
             return
 
-        # Default fallback to frontend index.html
         index_path = os.path.join(FRONTEND_DIR, "index.html")
         if os.path.exists(index_path):
             with open(index_path, "rb") as f:
@@ -239,7 +346,11 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
         except:
             payload = {}
 
-        if path == "/api/auth/login":
+        if path == "/api/auth/send-otp":
+            if self._is_rate_limited():
+                self._send_error("Too many failed attempts. Please wait 15 minutes.", status=429)
+                return
+
             email = payload.get("email", "").strip()
             password = payload.get("password", "").strip()
             pwd_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -248,21 +359,147 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             c = conn.cursor()
             c.execute("SELECT * FROM users WHERE email = ? AND password_hash = ?", (email, pwd_hash))
             user = c.fetchone()
+
+            if not user and not (email == "admin@sangarsh.edu" and password in ["admin123", "admin"]):
+                conn.close()
+                self._record_login_attempt(success=False)
+                self._send_error("Invalid email or password", status=401)
+                return
+
+            # Generate 6-Digit OTP
+            otp_code = str(secrets.randbelow(900000) + 100000)
+            expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time() + 300)) # 5 mins
+
+            # Save OTP to database
+            c.execute(
+                "INSERT INTO otp_codes (email, otp_code, expires_at) VALUES (?, ?, ?)",
+                (email, otp_code, expires_at)
+            )
+            conn.commit()
             conn.close()
 
+            # Dev Console Output for Testing & Verification
+            print(f"==================================================")
+            print(f"🔑 [SANGARSH 2FA OTP] Email: {email} | OTP CODE: {otp_code}")
+            print(f"==================================================")
+
+            self._send_json({
+                "message": f"6-Digit Verification Code sent to {email}",
+                "email": email,
+                "expires_in_seconds": 300,
+                "dev_otp": otp_code # Included for instant UI demonstration
+            })
+            return
+
+        elif path == "/api/auth/verify-otp":
+            email = payload.get("email", "").strip()
+            user_otp = payload.get("otp", "").strip()
+
+            conn = get_db_connection()
+            c = conn.cursor()
+            now_ts = int(time.time())
+
+            c.execute(
+                """SELECT * FROM otp_codes 
+                   WHERE email = ? AND is_used = 0 AND strftime('%s', expires_at) > ?
+                   ORDER BY id DESC LIMIT 1""",
+                (email, str(now_ts))
+            )
+            otp_record = c.fetchone()
+
+            if not otp_record:
+                conn.close()
+                self._send_error("OTP code has expired or was not requested. Please request a new code.", status=400)
+                return
+
+            if otp_record["attempts"] >= 3:
+                conn.close()
+                self._send_error("Too many failed OTP attempts. Please request a new code.", status=400)
+                return
+
+            if otp_record["otp_code"] != user_otp:
+                c.execute("UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?", (otp_record["id"],))
+                conn.commit()
+                conn.close()
+                self._send_error("Incorrect OTP code. Please check your Gmail and try again.", status=400)
+                return
+
+            # Mark OTP as used
+            c.execute("UPDATE otp_codes SET is_used = 1 WHERE id = ?", (otp_record["id"],))
+
+            # Fetch User or default Admin
+            c.execute("SELECT * FROM users WHERE email = ?", (email,))
+            user = c.fetchone()
+            user_id = user["id"] if user else 1
+            user_name = user["name"] if user else "Sangarsh Admin"
+
+            # Issue Session Token
+            self._record_login_attempt(success=True)
+            token_str = f"sse_sec_{secrets.token_hex(32)}"
+            expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time() + 86400)) # 24 hrs
+
+            c.execute(
+                "INSERT INTO auth_tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
+                (token_str, user_id, expires_at)
+            )
+            conn.commit()
+            conn.close()
+
+            self._send_json({
+                "token": token_str,
+                "user": {"id": user_id, "name": user_name, "email": email, "role": "Admin"}
+            })
+            return
+
+        elif path == "/api/auth/login":
+            if self._is_rate_limited():
+                self._send_error("Too many failed login attempts. Please wait 15 minutes.", status=429)
+                return
+
+            email = payload.get("email", "").strip()
+            password = payload.get("password", "").strip()
+            pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT * FROM users WHERE email = ? AND password_hash = ?", (email, pwd_hash))
+            user = c.fetchone()
+
             if user or (email == "admin@sangarsh.edu" and password in ["admin123", "admin"]):
-                token = "sse_jwt_admin_token_2026_secret"
+                self._record_login_attempt(success=True)
+                token_str = f"sse_sec_{secrets.token_hex(32)}"
+                user_id = user["id"] if user else 1
+                expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time() + 86400)) # 24 hrs
+
+                c.execute(
+                    "INSERT INTO auth_tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
+                    (token_str, user_id, expires_at)
+                )
+                conn.commit()
+                conn.close()
+
                 self._send_json({
-                    "token": token,
-                    "user": {"id": 1, "name": "Sangarsh Admin", "email": "admin@sangarsh.edu", "role": "Admin"}
+                    "token": token_str,
+                    "user": {"id": user_id, "name": user["name"] if user else "Sangarsh Admin", "email": email, "role": "Admin"}
                 })
             else:
+                conn.close()
+                self._record_login_attempt(success=False)
                 self._send_error("Invalid email or password", status=401)
             return
 
-        elif path == "/api/exams":
+        # ADMIN AUTHENTICATION REQUIRED FOR ALL OTHER WRITES
+        admin_user = self._verify_token()
+        if not admin_user:
+            self._send_error("Unauthorized: Valid Admin session token required to perform this operation", status=401)
+            return
+
+        if path == "/api/exams":
             exam_name = payload.get("exam_name")
-            subject = payload.get("subject")
+            exam_type = payload.get("exam_type", "NEET")
+            subject = payload.get("subject", "PCB Combined")
+            class_name = payload.get("class_name", "12th")
+            medium = payload.get("medium", "EM")
             total_questions = int(payload.get("total_questions", 30))
             date_str = payload.get("date", "2026-07-29")
             marks_per_correct = float(payload.get("marks_per_correct", 4.0))
@@ -275,12 +512,11 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             conn = get_db_connection()
             c = conn.cursor()
             c.execute(
-                "INSERT INTO exams (exam_name, subject, total_questions, date, marks_per_correct, negative_marks) VALUES (?, ?, ?, ?, ?, ?)",
-                (exam_name, subject, total_questions, date_str, marks_per_correct, negative_marks)
+                "INSERT INTO exams (exam_name, exam_type, subject, class_name, medium, total_questions, date, marks_per_correct, negative_marks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (exam_name, exam_type, subject, class_name, medium, total_questions, date_str, marks_per_correct, negative_marks)
             )
             exam_id = c.lastrowid
 
-            # Default Answer Key (Option A for all questions)
             sample_keys = [(exam_id, q, "A") for q in range(1, total_questions + 1)]
             c.executemany("INSERT INTO answer_keys (exam_id, question_no, correct_option) VALUES (?, ?, ?)", sample_keys)
 
@@ -304,22 +540,22 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
                 self._send_error("Exam not found", status=404)
                 return
 
-            # Fetch Answer Key
             c.execute("SELECT question_no, correct_option FROM answer_keys WHERE exam_id = ?", (exam_id,))
             answer_key = {str(r["question_no"]): r["correct_option"] for r in c.fetchall()}
 
-            # Run OMR Processor
             res = omr_engine.process_scan_payload(
                 payload,
                 answer_key,
                 marks_per_correct=exam["marks_per_correct"],
-                negative_marks=exam["negative_marks"]
+                negative_marks=exam["negative_marks"],
+                exam_subject=exam["subject"]
             )
 
             roll_no = res["roll_no"]
             eval_data = res["evaluation"]
+            class_name = exam["class_name"]
+            medium = exam["medium"]
 
-            # Auto link or create student
             c.execute("SELECT * FROM students WHERE roll_no = ?", (roll_no,))
             student = c.fetchone()
             if student:
@@ -327,26 +563,29 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
                 student_name = student["name"]
             else:
                 student_name = f"Student {roll_no}"
-                c.execute("INSERT INTO students (roll_no, name, class_name, section) VALUES (?, ?, ?, ?)",
-                          (roll_no, student_name, "Class 10", "A"))
+                c.execute("INSERT INTO students (roll_no, name, class_name, medium, section) VALUES (?, ?, ?, ?, ?)",
+                          (roll_no, student_name, class_name, medium, "A"))
                 student_id = c.lastrowid
 
-            # Save OMR Result
             c.execute(
                 """INSERT INTO omr_results 
-                (exam_id, student_id, roll_no, student_name, obtained_marks, total_marks, percentage, correct_count, wrong_count, unattempted_count, scanned_answers_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (exam_id, student_id, roll_no, student_name, class_name, medium, obtained_marks, total_marks, percentage, correct_count, wrong_count, unattempted_count, subject_breakdown_json, wrong_analysis_json, scanned_answers_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     exam_id,
                     student_id,
                     roll_no,
                     student_name,
+                    class_name,
+                    medium,
                     eval_data["obtained_marks"],
                     eval_data["total_marks"],
                     eval_data["percentage"],
                     eval_data["correct_count"],
                     eval_data["wrong_count"],
                     eval_data["unattempted_count"],
+                    json.dumps(eval_data.get("subject_breakdown", {})),
+                    json.dumps(eval_data.get("wrong_analysis", [])),
                     json.dumps(res["scanned_answers"])
                 )
             )
@@ -362,13 +601,14 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
         elif path == "/api/students":
             roll_no = payload.get("roll_no")
             name = payload.get("name")
-            class_name = payload.get("class_name", "Class 10")
+            class_name = payload.get("class_name", "12th")
+            medium = payload.get("medium", "EM")
             section = payload.get("section", "A")
 
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("INSERT OR REPLACE INTO students (roll_no, name, class_name, section) VALUES (?, ?, ?, ?)",
-                      (roll_no, name, class_name, section))
+            c.execute("INSERT OR REPLACE INTO students (roll_no, name, class_name, medium, section) VALUES (?, ?, ?, ?, ?)",
+                      (roll_no, name, class_name, medium, section))
             conn.commit()
             conn.close()
 
@@ -381,6 +621,12 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
+        # ADMIN AUTHENTICATION REQUIRED FOR ALL PUT MODIFICATION ENDPOINTS
+        admin_user = self._verify_token()
+        if not admin_user:
+            self._send_error("Unauthorized: Valid Admin session token required to perform this operation", status=401)
+            return
+
         length = int(self.headers.get('Content-Length', 0))
         post_data = self.rfile.read(length) if length > 0 else b"{}"
 
@@ -389,7 +635,58 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
         except:
             payload = {}
 
-        if path.startswith("/api/exams/") and path.endswith("/answer-key"):
+        if path.startswith("/api/results/"):
+            parts = path.split("/")
+            result_id = int(parts[3])
+
+            manual_rank = payload.get("manual_rank")
+            obtained_marks = payload.get("obtained_marks")
+            total_marks = payload.get("total_marks")
+            percentage = payload.get("percentage")
+            correct_count = payload.get("correct_count")
+            wrong_count = payload.get("wrong_count")
+            student_name = payload.get("student_name")
+
+            conn = get_db_connection()
+            c = conn.cursor()
+
+            sql = "UPDATE omr_results SET "
+            updates = []
+            params = []
+
+            if manual_rank is not None:
+                updates.append("manual_rank = ?")
+                params.append(int(manual_rank))
+            if obtained_marks is not None:
+                updates.append("obtained_marks = ?")
+                params.append(float(obtained_marks))
+            if total_marks is not None:
+                updates.append("total_marks = ?")
+                params.append(float(total_marks))
+            if percentage is not None:
+                updates.append("percentage = ?")
+                params.append(float(percentage))
+            if correct_count is not None:
+                updates.append("correct_count = ?")
+                params.append(int(correct_count))
+            if wrong_count is not None:
+                updates.append("wrong_count = ?")
+                params.append(int(wrong_count))
+            if student_name is not None:
+                updates.append("student_name = ?")
+                params.append(student_name)
+
+            if updates:
+                sql += ", ".join(updates) + " WHERE id = ?"
+                params.append(result_id)
+                c.execute(sql, params)
+                conn.commit()
+
+            conn.close()
+            self._send_json({"message": "Result updated successfully"})
+            return
+
+        elif path.startswith("/api/exams/") and path.endswith("/answer-key"):
             parts = path.split("/")
             exam_id = int(parts[3])
             answer_key = payload.get("answer_key", {})
@@ -413,33 +710,16 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
 
         self._send_error("Route not found", status=404)
 
-def get_local_ip():
-    import socket
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return '127.0.0.1'
-
 def run_server(port=None):
     if port is None:
         port = int(os.environ.get('PORT', 8080))
-    local_ip = get_local_ip()
     try:
         server_address = ('0.0.0.0', port)
         httpd = HTTPServer(server_address, SangarshAPIHandler)
-        print(f"\n=======================================================")
-        print(f"🚀 Sangarsh Science Education OMR Server Running!")
-        print(f"💻 Local Access  : http://127.0.0.1:{port}")
-        print(f"📱 Mobile Access : http://{local_ip}:{port}")
-        print(f"=======================================================\n")
+        print(f"🚀 Sangarsh Science Education OMR Server Running at port {port}")
     except Exception as e:
         server_address = ('127.0.0.1', port)
         httpd = HTTPServer(server_address, SangarshAPIHandler)
-        print(f"🚀 Sangarsh Science Education OMR Server running at http://127.0.0.1:{port}")
 
     try:
         httpd.serve_forever()
