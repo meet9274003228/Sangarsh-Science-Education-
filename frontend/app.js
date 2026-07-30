@@ -28,6 +28,7 @@ const state = {
   authMode: 'login', // 'login', 'register', 'forgot_password'
   otpStep: 1, // 1: Email/Password/Name -> 2: OTP Verification
   otpEmail: '',
+  otpInput: '',
   devOtpCode: null,
   otpError: '',
   otpSuccessMsg: '',
@@ -995,7 +996,7 @@ function renderLogin() {
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 text-center">Enter 6-Digit OTP Code</label>
-            <input type="text" id="otpCodeInput" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required autofocus class="w-full text-center text-2xl font-mono font-extrabold tracking-widest bg-white border-2 border-blue-600 rounded-xl py-3 text-slate-900 outline-none shadow-sm">
+            <input type="text" id="otpCodeInput" placeholder="123456" maxlength="6" pattern="[0-9]{6}" value="${state.otpInput || ''}" oninput="state.otpInput = this.value; state.otpError = '';" required autofocus class="w-full text-center text-2xl font-mono font-extrabold tracking-widest bg-white border-2 border-blue-600 rounded-xl py-3 text-slate-900 outline-none shadow-sm">
           </div>
 
           <button type="submit" ${state.isLoading ? 'disabled' : ''} class="btn-gold w-full py-3 text-sm font-extrabold shadow-md flex items-center justify-center gap-2">
@@ -1003,7 +1004,7 @@ function renderLogin() {
           </button>
 
           <div class="flex items-center justify-between text-xs pt-1">
-            <button type="button" onclick="handleSendOtp(null)" ${state.resendCooldown > 0 || state.isLoading ? 'disabled' : ''} class="font-bold ${state.resendCooldown > 0 || state.isLoading ? 'text-slate-400 cursor-not-allowed' : 'text-blue-700 hover:underline'}">
+            <button type="button" id="resendOtpBtn" onclick="handleSendOtp(null)" ${state.resendCooldown > 0 || state.isLoading ? 'disabled' : ''} class="font-bold ${state.resendCooldown > 0 || state.isLoading ? 'text-slate-400 cursor-not-allowed' : 'text-blue-700 hover:underline'}">
               ↻ ${state.resendCooldown > 0 ? `Resend OTP in ${state.resendCooldown}s` : 'Resend OTP Code'}
             </button>
             <button type="button" onclick="resetOtpStep()" class="text-slate-500 font-medium hover:underline">
@@ -1167,6 +1168,7 @@ function setAuthMode(mode) {
   state.otpStep = 1;
   state.otpError = '';
   state.otpSuccessMsg = '';
+  state.otpInput = '';
   state.devOtpCode = null;
   state.isLoading = false;
   if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);
@@ -1178,6 +1180,7 @@ function resetOtpStep() {
   state.otpStep = 1;
   state.otpError = '';
   state.otpSuccessMsg = '';
+  state.otpInput = '';
   state.devOtpCode = null;
   state.isLoading = false;
   if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);
@@ -1188,7 +1191,7 @@ function resetOtpStep() {
 function startResendTimer() {
   if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);
   state.resendCooldown = 60;
-  renderApp();
+  updateResendTimerUI();
 
   state.cooldownTimerId = setInterval(() => {
     state.resendCooldown -= 1;
@@ -1196,8 +1199,23 @@ function startResendTimer() {
       clearInterval(state.cooldownTimerId);
       state.resendCooldown = 0;
     }
-    renderApp();
+    updateResendTimerUI();
   }, 1000);
+}
+
+function updateResendTimerUI() {
+  const timerBtn = document.getElementById('resendOtpBtn');
+  if (timerBtn) {
+    if (state.resendCooldown > 0) {
+      timerBtn.disabled = true;
+      timerBtn.className = "font-bold text-slate-400 cursor-not-allowed";
+      timerBtn.innerHTML = `↻ Resend OTP in ${state.resendCooldown}s`;
+    } else {
+      timerBtn.disabled = state.isLoading;
+      timerBtn.className = "font-bold text-blue-700 hover:underline";
+      timerBtn.innerHTML = `↻ Resend OTP Code`;
+    }
+  }
 }
 
 function getGasWebAppUrl() {
@@ -1269,7 +1287,9 @@ async function handleSendOtp(e) {
     state.isLoading = false;
     state.otpStep = 2;
     state.devOtpCode = data.dev_otp || null; // Null in GAS production responses for security
+    state.otpInput = data.dev_otp ? String(data.dev_otp) : '';
     state.otpSuccessMsg = data.message || `Verification Code sent to ${email}`;
+    renderApp();
     startResendTimer();
   } catch (err) {
     state.isLoading = false;
@@ -1280,8 +1300,8 @@ async function handleSendOtp(e) {
 
 async function handleVerifyOtp(e) {
   if (e) e.preventDefault();
-  const otpInput = document.getElementById('otpCodeInput');
-  const otp = otpInput ? otpInput.value.trim() : '';
+  const otpInputEl = document.getElementById('otpCodeInput');
+  const otp = state.otpInput ? state.otpInput.trim() : (otpInputEl ? otpInputEl.value.trim() : '');
 
   if (!otp || otp.length !== 6) {
     state.otpError = 'Please enter a valid 6-digit OTP code.';
@@ -1354,6 +1374,7 @@ async function handleVerifyOtp(e) {
       state.token = data.token;
       state.user = data.user;
       state.otpStep = 1;
+      state.otpInput = '';
       state.devOtpCode = null;
       state.authMode = 'login';
       if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);

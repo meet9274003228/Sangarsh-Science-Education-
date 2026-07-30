@@ -90,8 +90,8 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             """SELECT t.*, u.id as user_id, u.name, u.email, u.role 
                FROM auth_tokens t 
                JOIN users u ON t.user_id = u.id 
-               WHERE t.token = ? AND strftime('%s', t.expires_at) > ?""",
-            (token, str(now_ts))
+               WHERE t.token = ? AND datetime(t.expires_at) > datetime('now')""",
+            (token,)
         )
         token_row = c.fetchone()
         conn.close()
@@ -416,9 +416,9 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             # Verify OTP
             c.execute(
                 """SELECT * FROM otp_codes 
-                   WHERE email = ? AND is_used = 0 AND strftime('%s', expires_at) > ?
+                   WHERE email = ? AND is_used = 0 AND datetime(expires_at) > datetime('now')
                    ORDER BY id DESC LIMIT 1""",
-                (email, str(now_ts))
+                (email,)
             )
             otp_record = c.fetchone()
 
@@ -478,9 +478,9 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             # Verify OTP
             c.execute(
                 """SELECT * FROM otp_codes 
-                   WHERE email = ? AND is_used = 0 AND strftime('%s', expires_at) > ?
+                   WHERE email = ? AND is_used = 0 AND datetime(expires_at) > datetime('now')
                    ORDER BY id DESC LIMIT 1""",
-                (email, str(now_ts))
+                (email,)
             )
             otp_record = c.fetchone()
 
@@ -531,13 +531,12 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
 
             conn = get_db_connection()
             c = conn.cursor()
-            now_ts = int(time.time())
 
             c.execute(
                 """SELECT * FROM otp_codes 
-                   WHERE email = ? AND is_used = 0 AND strftime('%s', expires_at) > ?
+                   WHERE email = ? AND is_used = 0 AND datetime(expires_at) > datetime('now')
                    ORDER BY id DESC LIMIT 1""",
-                (email, str(now_ts))
+                (email,)
             )
             otp_record = c.fetchone()
 
