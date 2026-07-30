@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 FastAPI / Python Standard Web Server for Sangarsh Science Education.
 Provides REST APIs for Authentication, Exam Management, Answer Key Builder,
