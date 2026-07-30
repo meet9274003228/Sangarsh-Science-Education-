@@ -1651,22 +1651,25 @@ async function processOMRImage(file) {
           pixelChecksum = (pixelChecksum + normData[i] * (i + 1)) % 1000007;
         }
 
-        // Step 3: Pure Image Pixel Darkness & Unattempted Thresholding Algorithm
+        // Step 3: Percentage-Based Option Core Zone Sampling (prevents touching text/margins)
         const optionColBounds = [
-          { start: 110, end: 160 }, // Option A
-          { start: 170, end: 220 }, // Option B
-          { start: 230, end: 280 }, // Option C
-          { start: 290, end: 340 }  // Option D
+          { start: Math.floor(normCanvas.width * 0.37), end: Math.floor(normCanvas.width * 0.46) }, // Option A
+          { start: Math.floor(normCanvas.width * 0.50), end: Math.floor(normCanvas.width * 0.59) }, // Option B
+          { start: Math.floor(normCanvas.width * 0.63), end: Math.floor(normCanvas.width * 0.72) }, // Option C
+          { start: Math.floor(normCanvas.width * 0.76), end: Math.floor(normCanvas.width * 0.85) }  // Option D
         ];
+
+        const baselineStart = Math.floor(normCanvas.width * 0.26);
+        const baselineEnd = Math.floor(normCanvas.width * 0.34);
 
         for (let q = 1; q <= totalQ; q++) {
           const rowStartY = Math.floor((q - 1) * rowHeight);
           const rowEndY = Math.floor(q * rowHeight);
 
-          // Calculate Baseline Row Paper Luminance (white space of question row)
+          // Calculate Baseline Row Paper Luminance (space between question number and Option A)
           let rowLumSum = 0, rowCount = 0;
           for (let y = rowStartY + 2; y < rowEndY - 2; y += 2) {
-            for (let x = 10; x < 60; x += 2) { // Left baseline margin
+            for (let x = baselineStart; x < baselineEnd; x += 2) {
               const idx = (y * normCanvas.width + x) * 4;
               rowLumSum += (0.299 * normData[idx] + 0.587 * normData[idx + 1] + 0.114 * normData[idx + 2]);
               rowCount++;
@@ -1692,7 +1695,7 @@ async function processOMRImage(file) {
 
             const avgOptLum = count > 0 ? (totalLum / count) : 255;
             
-            // True relative darkness contrast against row paper background (No artificial offsets)
+            // True relative darkness contrast against row paper background
             const relativeContrast = rowBaselineLum - avgOptLum;
 
             if (relativeContrast > maxDarknessContrast) {
@@ -1702,7 +1705,7 @@ async function processOMRImage(file) {
           }
 
           // If the relative contrast is above threshold (bubble is filled with ink/pencil compared to row paper)
-          if (maxDarknessContrast >= 28) {
+          if (maxDarknessContrast >= 22) {
             scannedAnswers[q] = bestOption;
           } else {
             scannedAnswers[q] = "NONE"; // Unattempted

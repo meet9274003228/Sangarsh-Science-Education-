@@ -636,8 +636,20 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
             medium = payload.get("medium", "EM")
             total_questions = int(payload.get("total_questions", 30))
             date_str = payload.get("date", "2026-07-29")
-            marks_per_correct = float(payload.get("marks_per_correct", 4.0))
-            negative_marks = float(payload.get("negative_marks", 1.0))
+            
+            # Automatic Exam Marking Scheme Rules (NEET, JEE, GUJCET, Board)
+            if exam_type in ["NEET", "JEE"]:
+                marks_per_correct = float(payload.get("marks_per_correct", 4.0))
+                negative_marks = float(payload.get("negative_marks", 1.0))
+            elif exam_type == "GUJCET":
+                marks_per_correct = float(payload.get("marks_per_correct", 1.0))
+                negative_marks = float(payload.get("negative_marks", 0.25))
+            elif exam_type == "Board":
+                marks_per_correct = float(payload.get("marks_per_correct", 1.0))
+                negative_marks = float(payload.get("negative_marks", 0.0))
+            else:
+                marks_per_correct = float(payload.get("marks_per_correct", 4.0))
+                negative_marks = float(payload.get("negative_marks", 1.0))
 
             if not exam_name or not subject:
                 self._send_error("exam_name and subject are required")
