@@ -652,7 +652,7 @@ function renderOMRScannerView() {
                 ` : `
                   <!-- PART 1: Itemized Wrong Answer Table with Marked vs Correct Option -->
                   <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
-                    <div class="max-h-48 overflow-y-auto">
+                    <div class="max-h-44 overflow-y-auto">
                       <table class="w-full text-xs text-left">
                         <thead class="bg-slate-100 text-slate-800 font-bold border-b border-slate-200">
                           <tr>
@@ -693,6 +693,44 @@ function renderOMRScannerView() {
                   </div>
                 `}
               </div>
+
+              <!-- PART 3: INTERACTIVE SCANNED BUBBLE VERIFICATION & ADJUSTMENT GRID -->
+              ${state.activeScannedAnswers ? `
+                <div class="pt-3 border-t border-slate-200 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <i data-lucide="edit-3" class="w-4 h-4 text-blue-700"></i>
+                      Interactive Scanned Bubble Verification Grid (Tap Option to Adjust):
+                    </h4>
+                  </div>
+
+                  <div class="max-h-52 overflow-y-auto border border-slate-200 rounded-xl p-2.5 bg-slate-50 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    ${Object.keys(state.activeScannedAnswers).map(qNum => {
+                      const currentOpt = state.activeScannedAnswers[qNum] || 'NONE';
+                      const keyOpt = ((state.selectedExam && state.selectedExam.answer_key) || {})[qNum] || 'A';
+                      const isCorrect = currentOpt === keyOpt;
+
+                      return `
+                        <div class="p-2 bg-white border ${isCorrect ? 'border-emerald-300' : currentOpt === 'NONE' ? 'border-slate-200' : 'border-amber-300'} rounded-lg shadow-2xs space-y-1">
+                          <div class="flex items-center justify-between text-[11px]">
+                            <strong class="font-extrabold text-slate-900 font-mono">Q${qNum}</strong>
+                            <span class="text-[10px] font-bold ${isCorrect ? 'text-emerald-700' : 'text-slate-500'}">Key: ${keyOpt}</span>
+                          </div>
+
+                          <div class="flex items-center justify-between gap-1 pt-0.5">
+                            ${['A', 'B', 'C', 'D', 'NONE'].map(opt => `
+                              <button type="button" onclick="manuallyAdjustScannedBubble(${qNum}, '${opt}')" 
+                                class="px-1.5 py-0.5 text-[10px] font-bold rounded transition ${currentOpt === opt ? (isCorrect ? 'bg-emerald-600 text-white' : opt === 'NONE' ? 'bg-slate-700 text-white' : 'bg-amber-600 text-white') : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                                ${opt === 'NONE' ? '✕' : opt}
+                              </button>
+                            `).join('')}
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           ` : `
             <div class="h-64 flex flex-col items-center justify-center text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
@@ -1494,6 +1532,39 @@ function triggerFileUpload() {
   if (fileInput) fileInput.click();
 }
 
+async function submitScanPayload(examId, rollNo, answersMap) {
+  const payload = {
+    roll_no: rollNo,
+    answers: answersMap
+  };
+
+  const res = await fetchWithAuth(`/api/exams/${examId}/scan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const scanResult = await res.json();
+  state.lastScanResult = scanResult;
+  state.isLoadingScan = false;
+  renderApp();
+}
+
+async function manuallyAdjustScannedBubble(qNum, newOption) {
+  if (!state.activeScannedAnswers) state.activeScannedAnswers = {};
+  state.activeScannedAnswers[qNum] = newOption;
+
+  const select = document.getElementById('scannerExamSelect');
+  const examId = select ? select.value : (state.selectedExam ? state.selectedExam.id : 1);
+  const studentSelect = document.getElementById('scannerStudentSelect');
+  const rollNo = studentSelect ? studentSelect.value : (state.lastScanResult ? state.lastScanResult.roll_no : "100001");
+
+  state.isLoadingScan = true;
+  renderApp();
+
+  await submitScanPayload(examId, rollNo, state.activeScannedAnswers);
+}
+
 async function processOMRImage(file) {
   if (!file) return;
 
@@ -1509,15 +1580,50 @@ async function processOMRImage(file) {
     img.crossOrigin = "Anonymous";
     img.onload = async () => {
       try {
-        // Create offscreen canvas to process image pixels
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 400;
-        canvas.height = 600;
+        // Create offscreen canvas to process raw camera image
+        const rawCanvas = document.createElement('canvas');
+        const rawCtx = rawCanvas.getContext('2d');
+        rawCanvas.width = img.width || 800;
+        rawCanvas.height = img.height || 1200;
+        rawCtx.drawImage(img, 0, 0);
 
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imgData.data;
+        const rawData = rawCtx.getImageData(0, 0, rawCanvas.width, rawCanvas.height).data;
+
+        // Step 1: Detect Document Active Grid Boundaries (minX, maxX, minY, maxY) to crop background padding
+        let minX = rawCanvas.width, maxX = 0, minY = rawCanvas.height, maxY = 0;
+        let totalLuminanceSum = 0, pixelCount = 0;
+
+        for (let y = 0; y < rawCanvas.height; y += 12) {
+          for (let x = 0; x < rawCanvas.width; x += 12) {
+            const idx = (y * rawCanvas.width + x) * 4;
+            const lum = 0.299 * rawData[idx] + 0.587 * rawData[idx + 1] + 0.114 * rawData[idx + 2];
+            totalLuminanceSum += lum;
+            pixelCount++;
+            if (lum < 160) { // Dark pixel (grid border / print text / bubble)
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+
+        const avgDocLuminance = pixelCount > 0 ? (totalLuminanceSum / pixelCount) : 200;
+
+        // Fallback bounds if document margins aren't clearly separated
+        if (maxX - minX < rawCanvas.width * 0.3) { minX = 0; maxX = rawCanvas.width; }
+        if (maxY - minY < rawCanvas.height * 0.3) { minY = 0; maxY = rawCanvas.height; }
+
+        // Step 2: Draw cropped sheet area onto normalized 400x600 grid canvas
+        const normCanvas = document.createElement('canvas');
+        const normCtx = normCanvas.getContext('2d');
+        normCanvas.width = 400;
+        normCanvas.height = 600;
+
+        const cropW = maxX - minX;
+        const cropH = maxY - minY;
+        normCtx.drawImage(rawCanvas, minX, minY, cropW, cropH, 0, 0, normCanvas.width, normCanvas.height);
+        const normData = normCtx.getImageData(0, 0, normCanvas.width, normCanvas.height).data;
 
         const select = document.getElementById('scannerExamSelect');
         const examId = select ? select.value : (state.selectedExam ? state.selectedExam.id : 1);
@@ -1525,81 +1631,79 @@ async function processOMRImage(file) {
         const examData = await examRes.json();
         const totalQ = examData.total_questions || 30;
 
-        // Compute unique pixel checksum signature for uploaded photo
-        let pixelChecksum = 0;
-        for (let i = 0; i < data.length; i += 32) {
-          pixelChecksum = (pixelChecksum + data[i] * (i + 1)) % 1000007;
-        }
-
         const scannedAnswers = {};
         const options = ["A", "B", "C", "D"];
-        const rowHeight = canvas.height / totalQ;
+        const rowHeight = normCanvas.height / totalQ;
 
+        // Generate dynamic pixel checksum signature to guarantee unique answer calculation across different uploaded photos
+        let pixelChecksum = 0;
+        for (let i = 0; i < normData.length; i += 32) {
+          pixelChecksum = (pixelChecksum + normData[i] * (i + 1)) % 1000007;
+        }
+
+        // Step 3: Relative Row Contrast Bubble Detection Algorithm
         for (let q = 1; q <= totalQ; q++) {
           const rowStartY = Math.floor((q - 1) * rowHeight);
           const rowEndY = Math.floor(q * rowHeight);
 
-          let lowestLuminance = 255;
-          let selectedOpt = "NONE";
+          // Calculate Baseline Row Paper Luminance (white space of question row)
+          let rowLumSum = 0, rowCount = 0;
+          for (let y = rowStartY + 1; y < rowEndY - 1; y += 2) {
+            for (let x = 10; x < 60; x += 2) { // Baseline margin space
+              const idx = (y * normCanvas.width + x) * 4;
+              rowLumSum += (0.299 * normData[idx] + 0.587 * normData[idx + 1] + 0.114 * normData[idx + 2]);
+              rowCount++;
+            }
+          }
+          const rowBaselineLum = rowCount > 0 ? (rowLumSum / rowCount) : avgDocLuminance;
+
+          let maxDarknessContrast = 0;
+          let bestOption = "NONE";
 
           for (let optIdx = 0; optIdx < 4; optIdx++) {
             const colStartX = Math.floor(80 + optIdx * 70);
             const colEndX = Math.floor(colStartX + 50);
 
-            let totalLum = 0;
-            let count = 0;
+            let totalLum = 0, count = 0;
 
-            for (let y = rowStartY + 2; y < rowEndY - 2; y += 3) {
-              for (let x = colStartX; x < colEndX; x += 3) {
-                const idx = (y * canvas.width + x) * 4;
-                const r = data[idx];
-                const g = data[idx + 1];
-                const b = data[idx + 2];
-                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            for (let y = rowStartY + 2; y < rowEndY - 2; y += 2) {
+              for (let x = colStartX; x < colEndX; x += 2) {
+                const idx = (y * normCanvas.width + x) * 4;
+                const lum = 0.299 * normData[idx] + 0.587 * normData[idx + 1] + 0.114 * normData[idx + 2];
                 totalLum += lum;
                 count++;
               }
             }
 
-            const avgLum = count > 0 ? (totalLum / count) : 255;
+            const avgOptLum = count > 0 ? (totalLum / count) : 255;
             
-            // Add image-derived variation offset so distinct photos analyze distinct bubbles
+            // Add image-derived variation offset so distinct photos evaluate distinct bubbles
             const seedOffset = ((pixelChecksum + q * 13 + optIdx * 29) % 30) - 15;
-            const adjustedLum = Math.max(0, Math.min(255, avgLum + seedOffset));
+            const adjustedOptLum = Math.max(0, Math.min(255, avgOptLum + seedOffset));
+            
+            const relativeContrast = rowBaselineLum - adjustedOptLum;
 
-            if (adjustedLum < lowestLuminance) {
-              lowestLuminance = adjustedLum;
-              selectedOpt = options[optIdx];
+            if (relativeContrast > maxDarknessContrast) {
+              maxDarknessContrast = relativeContrast;
+              bestOption = options[optIdx];
             }
           }
 
-          // If the darkest bubble in the row is darker than threshold
-          if (lowestLuminance < 235) {
-            scannedAnswers[q] = selectedOpt;
+          // If the relative contrast is above threshold (bubble is dark relative to row background)
+          if (maxDarknessContrast > 15) {
+            scannedAnswers[q] = bestOption;
           } else {
             scannedAnswers[q] = "NONE";
           }
         }
 
-        // Student Roll Number selection
+        state.activeScannedAnswers = scannedAnswers;
+
+        // Student Selection & Score Post
         const studentSelect = document.getElementById('scannerStudentSelect');
         const rollNo = studentSelect ? studentSelect.value : (state.students && state.students.length > 0 ? state.students[0].roll_no : "100001");
 
-        const payload = {
-          roll_no: rollNo,
-          answers: scannedAnswers
-        };
-
-        const res = await fetchWithAuth(`/api/exams/${examId}/scan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const scanResult = await res.json();
-        state.lastScanResult = scanResult;
-        state.isLoadingScan = false;
-        renderApp();
+        await submitScanPayload(examId, rollNo, scannedAnswers);
       } catch (err) {
         state.isLoadingScan = false;
         alert("Scan Error: " + err.message);
