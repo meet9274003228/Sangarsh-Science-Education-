@@ -636,6 +636,31 @@ function renderOMRScannerView() {
                 </div>
               ` : ''}
 
+              <!-- EXPLICIT SCORE FORMULA CALCULATION BREAKDOWN CARD -->
+              <div class="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2 text-xs">
+                <h4 class="font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 text-[11px]">
+                  <i data-lucide="calculator" class="w-4 h-4 text-amber-700"></i> Score Calculation Formula (${(state.selectedExam && state.selectedExam.exam_type) || 'NEET'} Pattern):
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono text-[11px]">
+                  <div class="p-2 bg-white rounded-lg border border-amber-200">
+                    <span class="text-slate-500 block text-[10px] uppercase font-sans font-bold">Correct (${evalData.correct_count || 0})</span>
+                    <strong class="text-emerald-700 font-bold">${evalData.correct_count || 0} × +${(state.selectedExam && state.selectedExam.marks_per_correct) || 4.0} = +${(evalData.correct_count || 0) * ((state.selectedExam && state.selectedExam.marks_per_correct) || 4.0)}</strong>
+                  </div>
+                  <div class="p-2 bg-white rounded-lg border border-amber-200">
+                    <span class="text-slate-500 block text-[10px] uppercase font-sans font-bold">Wrong (${evalData.wrong_count || 0})</span>
+                    <strong class="text-rose-700 font-bold">${evalData.wrong_count || 0} × -${(state.selectedExam && state.selectedExam.negative_marks) || 1.0} = -${(evalData.wrong_count || 0) * ((state.selectedExam && state.selectedExam.negative_marks) || 1.0)}</strong>
+                  </div>
+                  <div class="p-2 bg-white rounded-lg border border-amber-200">
+                    <span class="text-slate-500 block text-[10px] uppercase font-sans font-bold">Unattempted (${evalData.unattempted_count || 0})</span>
+                    <strong class="text-slate-600 font-bold">${evalData.unattempted_count || 0} × 0 = 0</strong>
+                  </div>
+                </div>
+                <div class="pt-1.5 border-t border-amber-200 flex items-center justify-between text-[11px] font-bold text-amber-950">
+                  <span>Formula: (+${(evalData.correct_count || 0) * ((state.selectedExam && state.selectedExam.marks_per_correct) || 4.0)}) - (${(evalData.wrong_count || 0) * ((state.selectedExam && state.selectedExam.negative_marks) || 1.0)})</span>
+                  <span class="text-xs font-extrabold text-blue-900">Final Score = ${evalData.obtained_marks} Marks</span>
+                </div>
+              </div>
+
               <!-- 2-PART ITEMIZED WRONG ANSWER ANALYSIS -->
               <div class="space-y-3 pt-2 border-t border-slate-200">
                 <div class="flex items-center justify-between">
