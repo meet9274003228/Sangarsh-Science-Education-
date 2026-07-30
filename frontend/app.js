@@ -31,6 +31,9 @@ const state = {
   devOtpCode: null,
   otpError: '',
   otpSuccessMsg: '',
+  isLoading: false,
+  resendCooldown: 0, // 60s Countdown timer
+  cooldownTimerId: null,
   regName: '',
   regPassword: '',
   resetPassword: ''
@@ -907,101 +910,103 @@ function renderLogin() {
                 <input type="password" id="loginPassword" value="admin123" placeholder="••••••••" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
               </div>
 
-              <button type="submit" class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
-                <i data-lucide="send" class="w-4 h-4"></i> Send 6-Digit Gmail OTP Code
-              </button>
-
-              <div class="text-right">
-                <button type="button" onclick="setAuthMode('forgot_password')" class="text-xs text-blue-700 font-bold hover:underline">
-                  Forgot Password?
-                </button>
-              </div>
-            </form>
-          ` : ''}
-
-          <!-- MODE 2: REGISTER NEW TEACHER -->
-          ${mode === 'register' ? `
-            <form onsubmit="handleSendOtp(event)" class="space-y-4">
-              <div class="bg-blue-50/70 border border-blue-200 p-3 rounded-xl text-xs text-blue-900 font-medium">
-                💡 Enter your Gmail address. We will send a 6-digit OTP code to verify your email before setting your password.
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Full Name</label>
-                <input type="text" id="regNameInput" placeholder="Meet Bharadava" value="${state.regName}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Gmail / Email Address</label>
-                <input type="email" id="loginEmail" placeholder="bharadavameet628@gmail.com" value="${state.otpEmail}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Set Password</label>
-                <input type="password" id="regPasswordInput" placeholder="Create new password" value="${state.regPassword}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
-              </div>
-
-              <button type="submit" class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
-                <i data-lucide="user-plus" class="w-4 h-4"></i> Send OTP to Register
-              </button>
-            </form>
-          ` : ''}
-
-          <!-- MODE 3: FORGOT PASSWORD -->
-          ${mode === 'forgot_password' ? `
-            <form onsubmit="handleSendOtp(event)" class="space-y-4">
-              <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900 font-medium">
-                🔑 Enter your Gmail. We will send a 6-digit OTP code to verify and reset your password.
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Registered Gmail / Email</label>
-                <input type="email" id="loginEmail" placeholder="yourname@gmail.com" value="${state.otpEmail}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">New Password</label>
-                <input type="password" id="resetPasswordInput" placeholder="Enter new password" value="${state.resetPassword}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
-              </div>
-
-              <button type="submit" class="btn-gold w-full py-3 text-sm font-extrabold shadow-md mt-2 flex items-center justify-center gap-2">
-                <i data-lucide="key" class="w-4 h-4"></i> Send OTP to Reset Password
-              </button>
-            </form>
-          ` : ''}
-
-        ` : `
-          <!-- STEP 2: ENTER 6-DIGIT OTP VERIFICATION CODE -->
-          <form onsubmit="handleVerifyOtp(event)" class="space-y-5">
-            <div class="bg-blue-50/70 border border-blue-200 p-3.5 rounded-xl text-center space-y-1">
-              <span class="text-[11px] font-bold text-blue-800 uppercase block">Verification Code Sent To:</span>
-              <strong class="text-sm font-extrabold text-slate-900 block font-mono">${state.otpEmail}</strong>
-              <p class="text-[11px] text-slate-500">Check your Gmail inbox for the 6-digit OTP code.</p>
-            </div>
-
-            ${state.devOtpCode ? `
-              <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-center">
-                <span class="text-[10px] font-bold text-amber-800 uppercase block">Instant Demo OTP Code:</span>
-                <strong class="text-xl font-extrabold text-amber-900 font-mono tracking-widest">${state.devOtpCode}</strong>
-              </div>
-            ` : ''}
-
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 text-center">Enter 6-Digit OTP Code</label>
-              <input type="text" id="otpCodeInput" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required autofocus class="w-full text-center text-2xl font-mono font-extrabold tracking-widest bg-white border-2 border-blue-600 rounded-xl py-3 text-slate-900 outline-none shadow-sm">
-            </div>
-
-            <button type="submit" class="btn-gold w-full py-3 text-sm font-extrabold shadow-md flex items-center justify-center gap-2">
-              <i data-lucide="lock" class="w-4 h-4"></i> ${mode === 'register' ? 'Verify & Create Account' : mode === 'forgot_password' ? 'Verify & Reset Password' : 'Verify OTP & Sign In'}
+            <button type="submit" ${state.isLoading ? 'disabled' : ''} class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
+              ${state.isLoading ? '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Sending OTP...' : '<i data-lucide="send" class="w-4 h-4"></i> Send 6-Digit Gmail OTP Code'}
             </button>
 
-            <div class="flex items-center justify-between text-xs pt-1">
-              <button type="button" onclick="handleSendOtp(null)" class="text-blue-700 font-bold hover:underline">
-                ↻ Resend OTP Code
-              </button>
-              <button type="button" onclick="resetOtpStep()" class="text-slate-500 font-medium hover:underline">
-                ← Back
+            <div class="text-right">
+              <button type="button" onclick="setAuthMode('forgot_password')" class="text-xs text-blue-700 font-bold hover:underline">
+                Forgot Password?
               </button>
             </div>
           </form>
-        `}
+        ` : ''}
+
+        <!-- MODE 2: REGISTER NEW TEACHER -->
+        ${mode === 'register' ? `
+          <form onsubmit="handleSendOtp(event)" class="space-y-4">
+            <div class="bg-blue-50/70 border border-blue-200 p-3 rounded-xl text-xs text-blue-900 font-medium">
+              💡 Enter your Gmail address. We will send a 6-digit OTP code to verify your email before setting your password.
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Full Name</label>
+              <input type="text" id="regNameInput" placeholder="Meet Bharadava" value="${state.regName}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Gmail / Email Address</label>
+              <input type="email" id="loginEmail" placeholder="bharadavameet628@gmail.com" value="${state.otpEmail}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Set Password</label>
+              <input type="password" id="regPasswordInput" placeholder="Create new password" value="${state.regPassword}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+            </div>
+
+            <button type="submit" ${state.isLoading ? 'disabled' : ''} class="btn-primary w-full py-3 text-sm font-bold shadow-md mt-2 flex items-center justify-center gap-2">
+              ${state.isLoading ? '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Sending OTP...' : '<i data-lucide="user-plus" class="w-4 h-4"></i> Send OTP to Register'}
+            </button>
+          </form>
+        ` : ''}
+
+        <!-- MODE 3: FORGOT PASSWORD -->
+        ${mode === 'forgot_password' ? `
+          <form onsubmit="handleSendOtp(event)" class="space-y-4">
+            <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900 font-medium">
+              🔑 Enter your Gmail. We will send a 6-digit OTP code to verify and reset your password.
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Registered Gmail / Email</label>
+              <input type="email" id="loginEmail" placeholder="yourname@gmail.com" value="${state.otpEmail}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">New Password</label>
+              <input type="password" id="resetPasswordInput" placeholder="Enter new password" value="${state.resetPassword}" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-600">
+            </div>
+
+            <button type="submit" ${state.isLoading ? 'disabled' : ''} class="btn-gold w-full py-3 text-sm font-extrabold shadow-md mt-2 flex items-center justify-center gap-2">
+              ${state.isLoading ? '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Sending OTP...' : '<i data-lucide="key" class="w-4 h-4"></i> Send OTP to Reset Password'}
+            </button>
+          </form>
+        ` : ''}
+
+      ` : `
+        <!-- STEP 2: ENTER 6-DIGIT OTP VERIFICATION CODE -->
+        <form onsubmit="handleVerifyOtp(event)" class="space-y-5">
+          <div class="bg-blue-50/70 border border-blue-200 p-3.5 rounded-xl text-center space-y-1.5">
+            <span class="text-[11px] font-bold text-blue-800 uppercase block">Verification Code Sent To:</span>
+            <strong class="text-sm font-extrabold text-slate-900 block font-mono">${state.otpEmail}</strong>
+            <button type="button" onclick="resetOtpStep()" class="text-[11px] text-blue-700 font-bold hover:underline inline-flex items-center gap-1">
+              ✏️ Change Email
+            </button>
+          </div>
+
+          ${state.devOtpCode ? `
+            <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-center">
+              <span class="text-[10px] font-bold text-amber-800 uppercase block">Instant Demo OTP Code:</span>
+              <strong class="text-xl font-extrabold text-amber-900 font-mono tracking-widest">${state.devOtpCode}</strong>
+            </div>
+          ` : ''}
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 text-center">Enter 6-Digit OTP Code</label>
+            <input type="text" id="otpCodeInput" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required autofocus class="w-full text-center text-2xl font-mono font-extrabold tracking-widest bg-white border-2 border-blue-600 rounded-xl py-3 text-slate-900 outline-none shadow-sm">
+          </div>
+
+          <button type="submit" ${state.isLoading ? 'disabled' : ''} class="btn-gold w-full py-3 text-sm font-extrabold shadow-md flex items-center justify-center gap-2">
+            ${state.isLoading ? '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Verifying OTP...' : `<i data-lucide="lock" class="w-4 h-4"></i> ${mode === 'register' ? 'Verify & Create Account' : mode === 'forgot_password' ? 'Verify & Reset Password' : 'Verify OTP & Sign In'}`}
+          </button>
+
+          <div class="flex items-center justify-between text-xs pt-1">
+            <button type="button" onclick="handleSendOtp(null)" ${state.resendCooldown > 0 || state.isLoading ? 'disabled' : ''} class="font-bold ${state.resendCooldown > 0 || state.isLoading ? 'text-slate-400 cursor-not-allowed' : 'text-blue-700 hover:underline'}">
+              ↻ ${state.resendCooldown > 0 ? `Resend OTP in ${state.resendCooldown}s` : 'Resend OTP Code'}
+            </button>
+            <button type="button" onclick="resetOtpStep()" class="text-slate-500 font-medium hover:underline">
+              ← Change Email
+            </button>
+          </div>
+        </form>
+      `}
       </div>
     </div>
   `;
@@ -1158,11 +1163,42 @@ function setAuthMode(mode) {
   state.otpError = '';
   state.otpSuccessMsg = '';
   state.devOtpCode = null;
+  state.isLoading = false;
+  if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);
+  state.resendCooldown = 0;
   renderApp();
+}
+
+function resetOtpStep() {
+  state.otpStep = 1;
+  state.otpError = '';
+  state.otpSuccessMsg = '';
+  state.devOtpCode = null;
+  state.isLoading = false;
+  if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);
+  state.resendCooldown = 0;
+  renderApp();
+}
+
+function startResendTimer() {
+  if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);
+  state.resendCooldown = 60;
+  renderApp();
+
+  state.cooldownTimerId = setInterval(() => {
+    state.resendCooldown -= 1;
+    if (state.resendCooldown <= 0) {
+      clearInterval(state.cooldownTimerId);
+      state.resendCooldown = 0;
+    }
+    renderApp();
+  }, 1000);
 }
 
 async function handleSendOtp(e) {
   if (e) e.preventDefault();
+
+  if (state.resendCooldown > 0) return;
 
   const emailInput = document.getElementById('loginEmail');
   const email = emailInput ? emailInput.value.trim() : state.otpEmail;
@@ -1184,6 +1220,8 @@ async function handleSendOtp(e) {
   state.otpError = '';
   state.otpSuccessMsg = '';
   state.otpEmail = email;
+  state.isLoading = true;
+  renderApp();
 
   try {
     let res, data;
@@ -1197,6 +1235,7 @@ async function handleSendOtp(e) {
       });
       data = await res.json();
       if (!data.success) {
+        state.isLoading = false;
         state.otpError = data.error || 'Failed to send OTP via Google Apps Script.';
         renderApp();
         return;
@@ -1210,17 +1249,20 @@ async function handleSendOtp(e) {
       });
       data = await res.json();
       if (!res.ok) {
+        state.isLoading = false;
         state.otpError = data.error || 'Failed to send OTP';
         renderApp();
         return;
       }
     }
 
+    state.isLoading = false;
     state.otpStep = 2;
     state.devOtpCode = data.dev_otp || null; // Null in GAS production responses for security
     state.otpSuccessMsg = data.message || `Verification Code sent to ${email}`;
-    renderApp();
+    startResendTimer();
   } catch (err) {
+    state.isLoading = false;
     state.otpError = 'Failed to send OTP: ' + err.message;
     renderApp();
   }
@@ -1239,6 +1281,8 @@ async function handleVerifyOtp(e) {
 
   state.otpError = '';
   state.otpSuccessMsg = '';
+  state.isLoading = true;
+  renderApp();
 
   try {
     if (state.gasWebAppUrl) {
@@ -1251,6 +1295,7 @@ async function handleVerifyOtp(e) {
       const gasData = await gasRes.json();
       
       if (!gasData.success) {
+        state.isLoading = false;
         state.otpError = gasData.error || 'Invalid OTP code.';
         renderApp();
         return;
@@ -1286,23 +1331,28 @@ async function handleVerifyOtp(e) {
     const data = await res.json();
 
     if (!res.ok) {
+      state.isLoading = false;
       state.otpError = data.error || 'Authentication error.';
       renderApp();
       return;
     }
 
+    state.isLoading = false;
     if (data.token) {
       state.token = data.token;
       state.user = data.user;
       state.otpStep = 1;
       state.devOtpCode = null;
       state.authMode = 'login';
+      if (state.cooldownTimerId) clearInterval(state.cooldownTimerId);
+      state.resendCooldown = 0;
       localStorage.setItem('sse_token', data.token);
       localStorage.setItem('sse_user', JSON.stringify(data.user));
       await fetchExams();
       renderApp();
     }
   } catch (err) {
+    state.isLoading = false;
     state.otpError = 'Verification Error: ' + err.message;
     renderApp();
   }
