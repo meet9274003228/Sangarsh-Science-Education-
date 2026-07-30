@@ -1651,15 +1651,22 @@ async function processOMRImage(file) {
           pixelChecksum = (pixelChecksum + normData[i] * (i + 1)) % 1000007;
         }
 
-        // Step 3: Relative Row Contrast Bubble Detection Algorithm
+        // Step 3: Pure Image Pixel Darkness & Unattempted Thresholding Algorithm
+        const optionColBounds = [
+          { start: 110, end: 160 }, // Option A
+          { start: 170, end: 220 }, // Option B
+          { start: 230, end: 280 }, // Option C
+          { start: 290, end: 340 }  // Option D
+        ];
+
         for (let q = 1; q <= totalQ; q++) {
           const rowStartY = Math.floor((q - 1) * rowHeight);
           const rowEndY = Math.floor(q * rowHeight);
 
           // Calculate Baseline Row Paper Luminance (white space of question row)
           let rowLumSum = 0, rowCount = 0;
-          for (let y = rowStartY + 1; y < rowEndY - 1; y += 2) {
-            for (let x = 10; x < 60; x += 2) { // Baseline margin space
+          for (let y = rowStartY + 2; y < rowEndY - 2; y += 2) {
+            for (let x = 10; x < 60; x += 2) { // Left baseline margin
               const idx = (y * normCanvas.width + x) * 4;
               rowLumSum += (0.299 * normData[idx] + 0.587 * normData[idx + 1] + 0.114 * normData[idx + 2]);
               rowCount++;
@@ -1671,13 +1678,11 @@ async function processOMRImage(file) {
           let bestOption = "NONE";
 
           for (let optIdx = 0; optIdx < 4; optIdx++) {
-            const colStartX = Math.floor(80 + optIdx * 70);
-            const colEndX = Math.floor(colStartX + 50);
-
+            const bounds = optionColBounds[optIdx];
             let totalLum = 0, count = 0;
 
             for (let y = rowStartY + 2; y < rowEndY - 2; y += 2) {
-              for (let x = colStartX; x < colEndX; x += 2) {
+              for (let x = bounds.start; x < bounds.end; x += 2) {
                 const idx = (y * normCanvas.width + x) * 4;
                 const lum = 0.299 * normData[idx] + 0.587 * normData[idx + 1] + 0.114 * normData[idx + 2];
                 totalLum += lum;
@@ -1687,11 +1692,8 @@ async function processOMRImage(file) {
 
             const avgOptLum = count > 0 ? (totalLum / count) : 255;
             
-            // Add image-derived variation offset so distinct photos evaluate distinct bubbles
-            const seedOffset = ((pixelChecksum + q * 13 + optIdx * 29) % 30) - 15;
-            const adjustedOptLum = Math.max(0, Math.min(255, avgOptLum + seedOffset));
-            
-            const relativeContrast = rowBaselineLum - adjustedOptLum;
+            // True relative darkness contrast against row paper background (No artificial offsets)
+            const relativeContrast = rowBaselineLum - avgOptLum;
 
             if (relativeContrast > maxDarknessContrast) {
               maxDarknessContrast = relativeContrast;
@@ -1699,11 +1701,11 @@ async function processOMRImage(file) {
             }
           }
 
-          // If the relative contrast is above threshold (bubble is dark relative to row background)
-          if (maxDarknessContrast > 15) {
+          // If the relative contrast is above threshold (bubble is filled with ink/pencil compared to row paper)
+          if (maxDarknessContrast >= 28) {
             scannedAnswers[q] = bestOption;
           } else {
-            scannedAnswers[q] = "NONE";
+            scannedAnswers[q] = "NONE"; // Unattempted
           }
         }
 
