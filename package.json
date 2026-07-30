@@ -1,0 +1,9 @@
+{
+  "name": "sangarsh-science-omr",
+  "version": "1.0.0",
+  "description": "Sangarsh Science Education OMR Evaluation & Security Portal",
+  "main": "frontend/app.js",
+  "dependencies": {
+    "firebase": "^10.8.0"
+  }
+}
