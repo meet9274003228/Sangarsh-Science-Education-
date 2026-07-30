@@ -535,7 +535,7 @@ function renderOMRScannerView() {
         </div>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <select id="scannerExamSelect" onchange="renderApp()" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 font-semibold outline-none">
+          <select id="scannerExamSelect" onchange="onScannerExamChange(this.value)" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 font-semibold outline-none">
             ${state.exams.map(e => `
               <option value="${e.id}" ${state.selectedExam && state.selectedExam.id === e.id ? 'selected' : ''}>
                 ${e.exam_name} (${e.exam_type || 'NEET'})
@@ -1500,10 +1500,18 @@ async function saveAnswerKey() {
       body: JSON.stringify({ answer_key: state.activeAnswerKey })
     });
     alert('Answer Key saved successfully!');
+    await fetchExamDetails(state.selectedExam.id);
     navigateTo('exams');
   } catch (err) {
     alert('Error saving key: ' + err.message);
   }
+}
+
+async function onScannerExamChange(examId) {
+  state.lastScanResult = null;
+  state.activeScannedAnswers = null;
+  await fetchExamDetails(examId);
+  renderApp();
 }
 
 function generateOMRSheet(examId) {
@@ -1629,6 +1637,8 @@ async function processOMRImage(file) {
         const examId = select ? select.value : (state.selectedExam ? state.selectedExam.id : 1);
         const examRes = await fetchWithAuth(`/api/exams/${examId}`);
         const examData = await examRes.json();
+        state.selectedExam = examData;
+        state.activeAnswerKey = examData.answer_key || {};
         const totalQ = examData.total_questions || 30;
 
         const scannedAnswers = {};

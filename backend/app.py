@@ -674,8 +674,14 @@ class SangarshAPIHandler(BaseHTTPRequestHandler):
                 self._send_error("Exam not found", status=404)
                 return
 
-            c.execute("SELECT question_no, correct_option FROM answer_keys WHERE exam_id = ?", (exam_id,))
+            c.execute("SELECT question_no, correct_option FROM answer_keys WHERE exam_id = ? ORDER BY question_no ASC", (exam_id,))
             answer_key = {str(r["question_no"]): r["correct_option"] for r in c.fetchall()}
+
+            # Auto-fill missing questions up to total_questions with default 'A'
+            total_q = exam["total_questions"] or 30
+            for q in range(1, total_q + 1):
+                if str(q) not in answer_key:
+                    answer_key[str(q)] = "A"
 
             res = omr_engine.process_scan_payload(
                 payload,
