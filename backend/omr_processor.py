@@ -12,13 +12,98 @@ class OMRProcessor:
     def __init__(self, darkness_threshold: float = 0.35):
         self.darkness_threshold = darkness_threshold
 
+    @staticmethod
+    def normalize_option(val) -> str:
+        """
+        Normalize detected answer / option key to standard uppercase letter format: 'A', 'B', 'C', 'D' or 'NONE'.
+        Handles:
+        - String letters: 'A', 'B', 'C', 'D', 'a', 'b', 'c', 'd'
+        - Numeric indices: 0 -> 'A', 1 -> 'B', 2 -> 'C', 3 -> 'D'
+        - String numeric indices: '0' -> 'A', '1' -> 'B', '2' -> 'C', '3' -> 'D'
+        - Unattempted / invalid values: None, '', 'NONE', 'UNATTEMPTED', -1, '-1'
+        """
+        if val is None:
+            return "NONE"
+
+        s_val = str(val).strip()
+        if not s_val or s_val.upper() in ["NONE", "NULL", "UNATTEMPTED", "NOT_ATTEMPTED", "-1"]:
+            return "NONE"
+
+        # Check numeric index conversion (0->A, 1->B, 2->C, 3->D)
+        if s_val in ["0", "1", "2", "3"]:
+            return chr(65 + int(s_val))
+        elif isinstance(val, (int, float)) and 0 <= int(val) <= 3:
+            return chr(65 + int(val))
+
+        # Check single letter (A, B, C, D)
+        upper_val = s_val.upper()
+        if upper_val in ["A", "B", "C", "D"]:
+            return upper_val
+
+        return upper_val
+
+    @staticmethod
+    def get_raw_value(data_dict, q_idx: int, total_questions: int = 30):
+        """
+        Flexibly look up answer for question index `q_idx` (1-indexed).
+        Handles:
+        - String 1-indexed key: '1'
+        - Int 1-indexed key: 1
+        - String 0-indexed key fallback (if 1-indexed key missing or dict is 0-indexed): '0'
+        - Int 0-indexed key fallback: 0
+        - List / Tuple indexing: data_dict[q_idx - 1]
+        """
+        if data_dict is None:
+            return None
+
+        if isinstance(data_dict, (list, tuple)):
+            if 0 <= q_idx - 1 < len(data_dict):
+                return data_dict[q_idx - 1]
+            elif 0 <= q_idx < len(data_dict):
+                return data_dict[q_idx]
+            return None
+
+        if not isinstance(data_dict, dict):
+            return None
+
+        q_str = str(q_idx)
+        q_int = int(q_idx)
+
+        # Detect if dictionary is explicitly 0-indexed (has 0/'0' and missing total_questions/str(total_questions))
+        is_zero_indexed = (('0' in data_dict or 0 in data_dict) and 
+                           (str(total_questions) not in data_dict and total_questions not in data_dict))
+
+        if is_zero_indexed:
+            q_zero_str = str(q_idx - 1)
+            q_zero_int = q_idx - 1
+            if q_zero_str in data_dict:
+                return data_dict[q_zero_str]
+            if q_zero_int in data_dict:
+                return data_dict[q_zero_int]
+
+        # Standard 1-indexed lookups
+        if q_str in data_dict:
+            return data_dict[q_str]
+        if q_int in data_dict:
+            return data_dict[q_int]
+
+        # Fallback 0-indexed lookup
+        q_zero_str = str(q_idx - 1)
+        q_zero_int = q_idx - 1
+        if q_zero_str in data_dict:
+            return data_dict[q_zero_str]
+        if q_zero_int in data_dict:
+            return data_dict[q_zero_int]
+
+        return None
+
     def evaluate_bubbles(self, raw_answers: dict, answer_key: dict, marks_per_correct: float = 4.0, negative_marks: float = 1.0, exam_subject: str = "Science") -> dict:
         """
         Compare scanned answers dictionary against answer_key dictionary.
         Returns score breakdown: obtained_marks, total_marks, percentage, correct_count, wrong_count, unattempted_count,
         wrong_analysis (list of incorrect questions & options), and subject_breakdown.
         """
-        total_questions = len(answer_key)
+        total_questions = len(answer_key) if answer_key else 30
         total_possible_marks = total_questions * marks_per_correct
 
         correct_count = 0
@@ -30,7 +115,6 @@ class OMRProcessor:
         wrong_analysis = []
 
         # Determine subject distribution for multi-subject exams
-        # e.g. If exam_subject is "PCB Combined" or "PCM Combined", split questions evenly
         is_multi_subject = "PCB" in exam_subject or "PCM" in exam_subject or "Combined" in exam_subject
         subjects = ["Physics", "Chemistry", "Biology" if "PCB" in exam_subject else "Mathematics"] if is_multi_subject else [exam_subject]
         
@@ -39,8 +123,16 @@ class OMRProcessor:
 
         for q_idx in range(1, total_questions + 1):
             q_str = str(q_idx)
-            correct_opt = str(answer_key.get(q_str, "A")).strip().upper()
-            scanned_opt = str(raw_answers.get(q_str, "NONE")).strip().upper()
+
+            # Retrieve raw detected & expected values using type-safe flex lookup
+            detected_raw = self.get_raw_value(raw_answers, q_idx, total_questions)
+            expected_raw = self.get_raw_value(answer_key, q_idx, total_questions)
+
+            # Normalize both values to standardized uppercase letter format ('A', 'B', 'C', 'D' or 'NONE')
+            scanned_opt = self.normalize_option(detected_raw)
+            correct_opt = self.normalize_option(expected_raw)
+            if correct_opt == "NONE":
+                correct_opt = "A" # Default fallback for missing key
 
             # Determine subject for this question
             if is_multi_subject:
