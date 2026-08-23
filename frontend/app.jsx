@@ -1,3 +1,4 @@
+/** @jsx React.createElement */
 const { useState, useEffect, useRef } = React;
 
 // API Base URL config

@@ -22,6 +22,13 @@
   
   <!-- Babel Standalone compiler for real-time browser JSX parsing/execution -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    Babel.registerPreset('classic-react', {
+      presets: [
+        [Babel.availablePresets['react'], { runtime: 'classic' }]
+      ]
+    });
+  </script>
 </head>
 <body>
 
@@ -29,7 +36,7 @@
   <div id="root"></div>
 
   <!-- Main React/TSX Application Logic -->
-  <script type="text/babel" data-presets="react" src="app.jsx"></script>
+  <script type="text/babel" data-presets="classic-react" src="app.jsx"></script>
 
 </body>
 </html>
