@@ -1,13 +1,27 @@
 /** @jsx React.createElement */
 const { useState, useEffect, useRef } = React;
 
-// API Base URL config
-const API_BASE_URL = "http://localhost:8000";
+// API Base URL config: detect if running locally or deployed on Render
+const getBackendUrl = () => {
+  const saved = localStorage.getItem("OMR_API_BASE_URL");
+  if (saved) return saved;
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || 
+      hostname === "127.0.0.1" || 
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) {
+    return "http://localhost:8000";
+  }
+  return window.location.origin;
+};
+const API_BASE_URL = getBackendUrl();
 
 // --- MAIN APPLICATION ENTRY ---
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard"); // dashboard, templates, template-editor, exams, scan, result, reports, settings
   const [templates, setTemplates] = useState([]);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [exams, setExams] = useState([]);
   
   // App-wide state
@@ -67,8 +81,21 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* MOBILE HEADER BAR */}
+      <header className="mobile-header">
+        <div className="logo-container" style={{margin: 0, padding: 0}}>
+          <div className="logo-icon">
+            <i data-lucide="scan-line"></i>
+          </div>
+          <span className="logo-text">Sangarsh OMR</span>
+        </div>
+        <button className="menu-toggle-btn" onClick={() => setMenuOpen(!menuOpen)}>
+          <i data-lucide={menuOpen ? "x" : "menu"}></i>
+        </button>
+      </header>
+
       {/* SIDEBAR NAVIGATION */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
         <div className="logo-container">
           <div className="logo-icon">
             <i data-lucide="scan-line"></i>
@@ -84,6 +111,7 @@ function App() {
               onClick={() => {
                 setCurrentPage(item.id);
                 setErrorMsg("");
+                setMenuOpen(false); // Close mobile drawer on routing
               }}
             >
               <i data-lucide={item.icon}></i>
@@ -316,6 +344,8 @@ function TemplatesView({ templates, onReload, setCurrentPage, setEditingTemplate
   const [name, setName] = useState("");
   const [questionsCount, setQuestionsCount] = useState(30);
   const [optionsCount, setOptionsCount] = useState(4);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -369,6 +399,8 @@ function TemplatesView({ templates, onReload, setCurrentPage, setEditingTemplate
       student_id_region: { x: 500, y: 70, w: 140, h: 230 }
     };
 
+    setError("");
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/templates`, {
         method: "POST",
@@ -379,9 +411,15 @@ function TemplatesView({ templates, onReload, setCurrentPage, setEditingTemplate
         setName("");
         setShowCreate(false);
         onReload();
+      } else {
+        const errorData = await res.json();
+        setError(errorData.detail || "Unable to save template configuration. Check validation rules.");
       }
     } catch (err) {
       console.error(err);
+      setError("Network timeout or connection refused from backend. Is OMR service online?");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -400,6 +438,13 @@ function TemplatesView({ templates, onReload, setCurrentPage, setEditingTemplate
       {showCreate && (
         <form className="card" onSubmit={handleSubmit}>
           <div className="card-title">Interactive Template Creator</div>
+          
+          {error && (
+            <div className="badge badge-error" style={{width: "100%", padding: "12px", borderRadius: "8px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px"}}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span>{error}</span>
+            </div>
+          )}
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Template Profile Name</label>
@@ -432,8 +477,16 @@ function TemplatesView({ templates, onReload, setCurrentPage, setEditingTemplate
               </select>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary">
-            <i data-lucide="sparkles"></i> Generate Coordinate Grid Config
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? (
+              <span style={{display: "inline-flex", alignItems: "center", gap: "8px"}}>
+                <span className="spinner-mini"></span> Generating layout grid...
+              </span>
+            ) : (
+              <>
+                <i data-lucide="sparkles"></i> Generate Coordinate Grid Config
+              </>
+            )}
           </button>
         </form>
       )}
@@ -1248,6 +1301,8 @@ function ExamsView({ exams, templates, onReload, setSelectedExamId, setCurrentPa
   const [subject, setSubject] = useState("");
   const [date, setDate] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   
   // Custom score config
   const [marksPos, setMarksPos] = useState(4.0);
@@ -1304,6 +1359,8 @@ function ExamsView({ exams, templates, onReload, setSelectedExamId, setCurrentPa
       answer_key: baseKey
     };
 
+    setError("");
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/exams`, {
         method: "POST",
@@ -1316,9 +1373,15 @@ function ExamsView({ exams, templates, onReload, setSelectedExamId, setCurrentPa
         setDate("");
         setShowCreate(false);
         onReload();
+      } else {
+        const errorData = await res.json();
+        setError(errorData.detail || "Unable to save exam parameters. Verify rules configuration.");
       }
     } catch (err) {
       console.error(err);
+      setError("Network timeout or connection refused from backend. Is OMR service online?");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1362,6 +1425,13 @@ function ExamsView({ exams, templates, onReload, setSelectedExamId, setCurrentPa
       {showCreate && (
         <form className="card" onSubmit={handleSubmit}>
           <div className="card-title">Setup Exam parameters</div>
+          
+          {error && (
+            <div className="badge badge-error" style={{width: "100%", padding: "12px", borderRadius: "8px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px"}}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span>{error}</span>
+            </div>
+          )}
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Exam Name</label>
@@ -1414,7 +1484,15 @@ function ExamsView({ exams, templates, onReload, setSelectedExamId, setCurrentPa
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary" style={{marginTop: "8px"}}>Create Exam Profile</button>
+          <button type="submit" className="btn btn-primary" style={{marginTop: "8px"}} disabled={loading}>
+            {loading ? (
+              <span style={{display: "inline-flex", alignItems: "center", gap: "8px"}}>
+                <span className="spinner-mini"></span> Creating exam profile...
+              </span>
+            ) : (
+              "Create Exam Profile"
+            )}
+          </button>
         </form>
       )}
 
@@ -1520,29 +1598,49 @@ function CameraScanner({ examName, onCapture, onClose }) {
   const [permissionError, setPermissionError] = React.useState(false);
   const [isCapturing, setIsCapturing] = React.useState(false);
 
+  const [insecureContextError, setInsecureContextError] = React.useState(false);
+
   React.useEffect(() => {
     // Start camera stream
     async function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn("Camera mediaDevices not supported or blocked in insecure context.");
+        setInsecureContextError(true);
+        setPermissionError(true);
+        return;
+      }
+
+      let stream = null;
       try {
+        // Attempt 1: Back camera with ideal resolution
         const constraints = {
           video: {
-            facingMode: "environment",
+            facingMode: { ideal: "environment" },
             width: { ideal: 1280 },
             height: { ideal: 720 }
           }
         };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        console.warn("Back camera with ideal resolution failed, trying broad constraints", err);
+        try {
+          // Attempt 2: Fallback to any video source
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (errFallback) {
+          console.error("All camera streams failed:", errFallback);
+          setPermissionError(true);
+          return;
+        }
+      }
+
+      if (stream) {
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
         }
-        
         // Start heuristics loop running 4 times per second (250ms)
         intervalRef.current = setInterval(runHeuristics, 250);
-      } catch (err) {
-        console.error("Camera access failed:", err);
-        setPermissionError(true);
       }
     }
     startCamera();
@@ -1807,9 +1905,11 @@ function CameraScanner({ examName, onCapture, onClose }) {
           <div style={{padding: "24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px"}}>
             {/* Inline SVG Camera-off icon */}
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34"></path><circle cx="12" cy="13" r="4"></circle></svg>
-            <h3>Camera Access Denied</h3>
+            <h3>{insecureContextError ? "Secure Context Required" : "Camera Access Denied"}</h3>
             <p style={{fontSize: "13px", color: "var(--text-secondary)"}}>
-              Please enable or grant camera permissions to use the live scan capture mode. Alternatively, you can upload file photos.
+              {insecureContextError 
+                ? "Mobile camera stream features require a secure connection (HTTPS or localhost). Please deploy with HTTPS or choose 'Browse Files' upload mode." 
+                : "Please enable or grant camera permissions to use the live scan capture mode. Alternatively, you can upload file photos."}
             </p>
           </div>
         ) : (
@@ -2622,14 +2722,54 @@ function ReportsView({ exams }) {
 // VIEW 7: SYSTEM SETTINGS
 // -------------------------------------------------------------
 function SettingsView() {
+  const [apiUrl, setApiUrl] = useState(localStorage.getItem("OMR_API_BASE_URL") || window.location.origin);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    localStorage.setItem("OMR_API_BASE_URL", apiUrl);
+    setSaveSuccess(true);
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  };
+
   return (
     <div>
       <div className="header">
         <div>
           <h1 className="header-title">System Configuration</h1>
-          <p className="header-subtitle">Configure OpenCV thresholds parameters, directories storage, and PostgreSQL migrations config.</p>
+          <p className="header-subtitle">Configure OMR backend URLs, computer vision thresholds, and database configuration.</p>
         </div>
       </div>
+
+      {saveSuccess && (
+        <div className="badge badge-success" style={{width: "100%", padding: "12px", borderRadius: "8px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px"}}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <span>Connection settings saved successfully. Reloading OMR app dashboard...</span>
+        </div>
+      )}
+
+      <form className="card" onSubmit={handleSaveSettings}>
+        <div className="card-title">Backend API Connection settings</div>
+        <div className="form-group" style={{marginBottom: "16px"}}>
+          <label className="form-label">FastAPI Backend Endpoint URL</label>
+          <input 
+            type="url" 
+            className="form-control" 
+            value={apiUrl} 
+            onChange={(e) => setApiUrl(e.target.value)} 
+            placeholder="http://localhost:8000" 
+            required 
+          />
+          <small style={{color: "var(--text-secondary)", fontSize: "12px", display: "block", marginTop: "4px"}}>
+            Specify the full URL of the running FastAPI server. If empty, defaults to current host (for Web Service setups) or localhost (for dev).
+          </small>
+        </div>
+        <button type="submit" className="btn btn-primary" style={{alignSelf: "flex-start"}}>
+          <i data-lucide="save"></i> Save Connection Config
+        </button>
+      </form>
 
       <div className="card">
         <div className="card-title">Computer Vision Tuning Defaults</div>
