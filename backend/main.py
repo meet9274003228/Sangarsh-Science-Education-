@@ -5,6 +5,9 @@ import sqlite3
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+# Add the backend folder to sys.path so nested relative imports work on Render root CWD executions
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 # Detect dependencies
 HAS_DEPS = True
 try:
@@ -17,8 +20,11 @@ try:
     from api.exams_router import router as exams_router
     from api.scans_router import router as scans_router
     from api.scans_router import UPLOAD_DIR
-except ImportError:
+except ImportError as e:
     HAS_DEPS = False
+    print(f"OMR BACKEND DEP IMPORT ERROR: {e}", file=sys.stderr)
+    import traceback
+    traceback.print_exc()
 
 # Database file reference
 DB_FILE = os.path.join(os.path.dirname(__file__), "omr_app.db")
