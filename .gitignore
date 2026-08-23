@@ -1,18 +1,26 @@
-# Virtual Environment
-venv/
-ENV/
-env/
+# OS files
+.DS_Store
+Thumbs.db
 
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.env
 
-# Database & Generated Artifacts
-backend/database.db
-*.pdf
+# Node/React
+node_modules/
+dist/
+build/
+.next/
+*.log
 
-# OS junk
-.DS_Store
-Thumbs.db
+# Project specific
+backend/omr_app.db
+backend/uploads/
+backend/debug_rois/
+/tmp/

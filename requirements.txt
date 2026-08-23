@@ -1,2 +1,0 @@
-# Sangarsh Science Education OMR System - Python Dependencies
-# Pure Python 3 Standard Library Web Server (No external pip dependencies required)

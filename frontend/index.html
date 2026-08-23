@@ -3,52 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sangarsh Science Education — OMR Evaluation System</title>
+  <title>OMR Answer-Sheet Checking and Assessment System</title>
   
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#EFF6FF',
-              100: '#DBEAFE',
-              500: '#2563EB',
-              600: '#1D4ED8',
-              700: '#1E40AF',
-              900: '#0F172A',
-            },
-            accent: {
-              gold: '#D97706',
-              navy: '#0F172A',
-            }
-          }
-        }
-      }
-    }
-  </script>
-
+  <!-- Modern Typography (Outfit & Inter from Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-
-  <!-- Custom Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body class="bg-slate-100 text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
   
-  <!-- Main Application Container -->
-  <div id="app" class="min-h-screen flex flex-col">
-    <!-- Rendered dynamically by app.js -->
-  </div>
+  <!-- Custom Core Design System Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
 
-  <!-- Firebase & Environment Config Modules -->
-  <script src="env-config.js"></script>
-  <script type="module" src="firebase-config.js"></script>
+  <!-- Production React & ReactDOM CDN (Requires zero Node.js server dependencies) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  
+  <!-- Babel Standalone compiler for real-time browser JSX parsing/execution -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
 
-  <!-- Main JavaScript Engine -->
-  <script src="app.js"></script>
+  <!-- Root mount node for React application -->
+  <div id="root"></div>
+
+  <!-- Main React/TSX Application Logic -->
+  <script type="text/babel" data-presets="react" src="app.jsx"></script>
+
 </body>
 </html>
